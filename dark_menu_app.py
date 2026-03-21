@@ -406,8 +406,6 @@ BASE_HTML = r'''
       </div>
     </div>
     <div class="nav">
-{% if public_nav %}
-  <a href="{{ url_for('index') }}">Menu</a>
       {% else %}
         <a href="{{ url_for('index') }}">Public Menu</a>
         <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
