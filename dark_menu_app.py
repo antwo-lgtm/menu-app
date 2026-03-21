@@ -429,7 +429,6 @@ BASE_HTML = r'''
       {% endif %}
     {% endwith %}
     {{ content|safe }}
-    <div class="footer">Local first. Put it online later.</div>
   </div>
 </body>
 </html>
