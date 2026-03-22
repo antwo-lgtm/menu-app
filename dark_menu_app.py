@@ -31,6 +31,168 @@ os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
+TRANSLATIONS = {
+    "en": {
+        "menu": "Menu",
+        "admin": "Admin",
+        "public_menu": "Public Menu",
+        "dashboard": "Dashboard",
+        "import": "Import",
+        "settings": "Settings",
+        "items": "Items",
+        "images": "Images",
+        "logout": "Logout",
+        "search": "Search",
+        "section": "Section",
+        "all_sections": "All Sections",
+        "all": "All",
+        "items_count": "items",
+        "no_items": "No matching items found.",
+        "login_title": "Admin Login",
+        "login_sub": "Enter your admin password.",
+        "password": "Password",
+        "login": "Login",
+        "wrong_password": "Wrong password.",
+        "logged_in": "Logged in.",
+        "logged_out": "Logged out.",
+        "admin_dashboard": "Admin Dashboard",
+        "admin_dashboard_sub": "Manage imports, settings, item images, and AI generation from here.",
+        "uploaded_images": "Uploaded images",
+        "ai_images": "AI images",
+        "import_menu": "Import Menu",
+        "required_columns": "Required columns: Category, Item Name, Description, Price",
+        "from_csv": "From CSV",
+        "csv_file": "CSV file",
+        "import_csv": "Import CSV",
+        "from_google_sheets": "From Google Sheets",
+        "google_sheets_url": "Google Sheets URL",
+        "paste_google_sheet": "Paste Google Sheets URL",
+        "import_google_sheet": "Import Google Sheet",
+        "choose_csv": "Choose a CSV file.",
+        "paste_sheet_url": "Paste a Google Sheets URL.",
+        "invalid_import_mode": "Invalid import mode.",
+        "csv_imported": "CSV imported",
+        "sheet_imported": "Google Sheet imported",
+        "import_failed": "Import failed",
+        "site_settings": "Site Settings",
+        "main_title": "Main title",
+        "subtitle": "Subtitle",
+        "logo": "Logo",
+        "save_settings": "Save Settings",
+        "settings_updated": "Settings updated.",
+        "item_images": "Item Images",
+        "item_images_sub": "Upload a manual picture for any item. Manual upload overrides AI image.",
+        "image": "Image",
+        "item": "Item",
+        "price": "Price",
+        "upload": "Upload",
+        "missing_item_or_image": "Missing item or image.",
+        "image_uploaded_for": "Image uploaded for",
+        "ai_images_title": "AI Images",
+        "ai_images_sub": "This page is optional. Manual item upload works even if AI generation fails.",
+        "how_many_images": "How many images",
+        "options": "Options",
+        "only_missing": "Only for items without image",
+        "generate": "Generate",
+        "preview": "Preview",
+        "openai_key_missing": "OPENAI_API_KEY not found. Manual uploads will still work.",
+        "images_generated": "Images generated",
+        "skipped": "Skipped",
+        "default_password_hint": "Default password is 1234 unless you change MENU_ADMIN_PASSWORD.",
+        "uncategorized": "Uncategorized",
+        "iqd": "IQD",
+    },
+    "ar": {
+        "menu": "المنيو",
+        "admin": "الإدارة",
+        "public_menu": "المنيو العام",
+        "dashboard": "لوحة التحكم",
+        "import": "استيراد",
+        "settings": "الإعدادات",
+        "items": "الأصناف",
+        "images": "الصور",
+        "logout": "تسجيل الخروج",
+        "search": "بحث",
+        "section": "القسم",
+        "all_sections": "كل الأقسام",
+        "all": "الكل",
+        "items_count": "صنف",
+        "no_items": "لا توجد أصناف مطابقة.",
+        "login_title": "تسجيل دخول الإدارة",
+        "login_sub": "أدخل كلمة مرور الإدارة.",
+        "password": "كلمة المرور",
+        "login": "دخول",
+        "wrong_password": "كلمة المرور غير صحيحة.",
+        "logged_in": "تم تسجيل الدخول.",
+        "logged_out": "تم تسجيل الخروج.",
+        "admin_dashboard": "لوحة التحكم",
+        "admin_dashboard_sub": "إدارة الاستيراد والإعدادات وصور الأصناف وتوليد الصور.",
+        "uploaded_images": "صور مرفوعة",
+        "ai_images": "صور ذكاء اصطناعي",
+        "import_menu": "استيراد المنيو",
+        "required_columns": "الأعمدة المطلوبة: Category, Item Name, Description, Price",
+        "from_csv": "من CSV",
+        "csv_file": "ملف CSV",
+        "import_csv": "استيراد CSV",
+        "from_google_sheets": "من Google Sheets",
+        "google_sheets_url": "رابط Google Sheets",
+        "paste_google_sheet": "ألصق رابط Google Sheets",
+        "import_google_sheet": "استيراد Google Sheet",
+        "choose_csv": "اختر ملف CSV.",
+        "paste_sheet_url": "ألصق رابط Google Sheets.",
+        "invalid_import_mode": "وضع استيراد غير صحيح.",
+        "csv_imported": "تم استيراد CSV",
+        "sheet_imported": "تم استيراد Google Sheet",
+        "import_failed": "فشل الاستيراد",
+        "site_settings": "إعدادات الموقع",
+        "main_title": "العنوان الرئيسي",
+        "subtitle": "العنوان الفرعي",
+        "logo": "الشعار",
+        "save_settings": "حفظ الإعدادات",
+        "settings_updated": "تم تحديث الإعدادات.",
+        "item_images": "صور الأصناف",
+        "item_images_sub": "ارفع صورة يدوية لأي صنف. الصورة اليدوية تتجاوز صورة الذكاء الاصطناعي.",
+        "image": "الصورة",
+        "item": "الصنف",
+        "price": "السعر",
+        "upload": "رفع",
+        "missing_item_or_image": "الصنف أو الصورة مفقود.",
+        "image_uploaded_for": "تم رفع صورة لـ",
+        "ai_images_title": "صور الذكاء الاصطناعي",
+        "ai_images_sub": "هذه الصفحة اختيارية. رفع الصور اليدوي يعمل حتى لو فشل التوليد.",
+        "how_many_images": "عدد الصور",
+        "options": "خيارات",
+        "only_missing": "فقط للأصناف بدون صورة",
+        "generate": "توليد",
+        "preview": "معاينة",
+        "openai_key_missing": "لم يتم العثور على OPENAI_API_KEY. رفع الصور اليدوي سيظل يعمل.",
+        "images_generated": "تم توليد الصور",
+        "skipped": "تم التخطي",
+        "default_password_hint": "كلمة المرور الافتراضية هي 1234 إلا إذا غيرت MENU_ADMIN_PASSWORD.",
+        "uncategorized": "بدون قسم",
+        "iqd": "د.ع",
+    },
+}
+
+
+def get_lang():
+    lang = request.args.get("lang", "").strip().lower()
+    if lang in ("en", "ar"):
+        session["lang"] = lang
+        return lang
+    return session.get("lang", "ar")
+
+
+def t(key):
+    lang = get_lang()
+    return TRANSLATIONS.get(lang, TRANSLATIONS["ar"]).get(key, key)
+
+
+def lang_url(endpoint, **kwargs):
+    kwargs["lang"] = get_lang()
+    return url_for(endpoint, **kwargs)
+
+
 def get_openai_client():
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key or OpenAI is None:
@@ -265,20 +427,20 @@ def is_admin():
 
 def require_admin():
     if not is_admin():
-        return redirect(url_for("admin_login"))
+        return redirect(lang_url("admin_login"))
     return None
 
 
 def build_item_view(item):
     return {
         **item,
-        "ImageURL": best_image_url(item["Item Name"], item["Category"] or "بدون قسم"),
+        "ImageURL": best_image_url(item["Item Name"], item["Category"] or t("uncategorized")),
     }
 
 
 BASE_HTML = r'''
 <!doctype html>
-<html lang="en" dir="rtl">
+<html lang="{{ lang }}" dir="{% if lang == 'ar' %}rtl{% else %}ltr{% endif %}">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -312,6 +474,7 @@ BASE_HTML = r'''
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
       padding: 14px 20px; backdrop-filter: blur(14px);
       background: rgba(9,9,11,.72); border-bottom: 1px solid rgba(255,255,255,.06);
+      flex-wrap: wrap;
     }
     .brand { display: flex; align-items: center; gap: 12px; }
     .brand-badge {
@@ -321,10 +484,21 @@ BASE_HTML = r'''
       flex-shrink: 0;
     }
     .brand-badge img { width: 100%; height: 100%; object-fit: cover; }
-    .nav { display: flex; flex-wrap: wrap; gap: 10px; }
+    .nav {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      align-items: center;
+    }
     .nav a {
       padding: 10px 14px; border-radius: 999px; background: #17171a;
       border: 1px solid var(--line); color: #e4e4e7;
+    }
+    .nav a.lang-active {
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #111;
+      border-color: transparent;
+      font-weight: 800;
     }
     .container { max-width: 1320px; margin: 0 auto; padding: 24px 16px 40px; }
     .hero { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 22px; }
@@ -341,7 +515,7 @@ BASE_HTML = r'''
     .stat .lbl { color: var(--muted); font-size: 13px; }
     .search-card { display: flex; flex-direction: column; justify-content: center; }
     .field-label { color: var(--muted); font-size: 13px; margin-bottom: 7px; }
-    .row { display: grid; grid-template-columns: 1.2fr .8fr auto; gap: 12px; align-items: end; }
+    .row { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; align-items: end; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .input, .select, .btn, .file, textarea {
       width: 100%; border-radius: 16px; border: 1px solid var(--line);
@@ -386,7 +560,7 @@ BASE_HTML = r'''
       background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); color: #d4d4d8; font-size: 12px;
     }
     table { width: 100%; border-collapse: collapse; }
-    th, td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: right; vertical-align: top; }
+    th, td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: start; vertical-align: top; }
     th { color: var(--muted); font-size: 13px; }
     .thumb { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: #111; }
     .tiny { color: var(--muted); font-size: 12px; line-height: 1.7; }
@@ -416,14 +590,19 @@ BASE_HTML = r'''
     </div>
 
     <div class="nav">
+      <a href="{{ url_for(request.endpoint, **request.view_args, lang='ar', **request.args.to_dict(flat=True)) if request.endpoint else url_for('index', lang='ar') }}" class="{% if lang == 'ar' %}lang-active{% endif %}">العربية</a>
+      <a href="{{ url_for(request.endpoint, **request.view_args, lang='en', **request.args.to_dict(flat=True)) if request.endpoint else url_for('index', lang='en') }}" class="{% if lang == 'en' %}lang-active{% endif %}">English</a>
+
       {% if not public_nav %}
-        <a href="{{ url_for('index') }}">Public Menu</a>
-        <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
-        <a href="{{ url_for('admin_import') }}">Import</a>
-        <a href="{{ url_for('admin_settings') }}">Settings</a>
-        <a href="{{ url_for('admin_items') }}">Items</a>
-        <a href="{{ url_for('generate_images_page') }}">Images</a>
-        <a href="{{ url_for('admin_logout') }}">Logout</a>
+        <a href="{{ lang_url('index') }}">{{ tr('public_menu') }}</a>
+        <a href="{{ lang_url('admin_dashboard') }}">{{ tr('dashboard') }}</a>
+        <a href="{{ lang_url('admin_import') }}">{{ tr('import') }}</a>
+        <a href="{{ lang_url('admin_settings') }}">{{ tr('settings') }}</a>
+        <a href="{{ lang_url('admin_items') }}">{{ tr('items') }}</a>
+        <a href="{{ lang_url('generate_images_page') }}">{{ tr('images') }}</a>
+        <a href="{{ lang_url('admin_logout') }}">{{ tr('logout') }}</a>
+      {% else %}
+        <a href="{{ lang_url('admin_login') }}">{{ tr('admin') }}</a>
       {% endif %}
     </div>
   </div>
@@ -449,7 +628,11 @@ def render_page(title, content, public_nav=True):
         title=title,
         content=content,
         settings=load_settings(),
-        public_nav=public_nav
+        public_nav=public_nav,
+        lang=get_lang(),
+        tr=t,
+        lang_url=lang_url,
+        request=request,
     )
 
 
@@ -465,6 +648,9 @@ def serve_upload(filename):
 
 @app.route("/")
 def index():
+    lang = get_lang()
+    uncategorized = t("uncategorized")
+
     items = load_menu()
     q = request.args.get("q", "").strip().lower()
     selected_category = request.args.get("category", "").strip()
@@ -472,7 +658,7 @@ def index():
     categories = []
     seen = set()
     for item in items:
-        cat = item["Category"] or "بدون قسم"
+        cat = item["Category"] or uncategorized
         if cat not in seen:
             seen.add(cat)
             categories.append(cat)
@@ -489,7 +675,7 @@ def index():
         if q and q not in blob:
             continue
 
-        actual_cat = item.get("Category") or "بدون قسم"
+        actual_cat = item.get("Category") or uncategorized
         if selected_category and actual_cat != selected_category:
             continue
 
@@ -497,31 +683,28 @@ def index():
 
     grouped = OrderedDict()
     for item in filtered:
-        cat = item["Category"] or "بدون قسم"
+        cat = item["Category"] or uncategorized
         grouped.setdefault(cat, []).append(build_item_view(item))
     grouped = OrderedDict((cat, rows) for cat, rows in grouped.items() if rows)
 
     content = render_template_string('''
     <div class="hero">
       <div class="card search-card">
-        <form method="get">
+        <form method="get" id="menuFilterForm">
+          <input type="hidden" name="lang" value="{{ lang }}">
           <div class="row">
             <div>
-              <div class="field-label">بحث</div>
-              <input class="input" type="text" name="q" value="{{ q }}" placeholder="ابحث عن صنف أو قسم...">
+              <div class="field-label">{{ tr('search') }}</div>
+              <input class="input" type="text" name="q" value="{{ q }}" placeholder="{{ tr('search') }}..." onkeydown="if(event.key==='Enter'){this.form.submit();}">
             </div>
             <div>
-              <div class="field-label">القسم</div>
-              <select class="select" name="category">
-                <option value="">كل الأقسام</option>
+              <div class="field-label">{{ tr('section') }}</div>
+              <select class="select" name="category" onchange="this.form.submit()">
+                <option value="">{{ tr('all_sections') }}</option>
                 {% for cat in categories %}
                   <option value="{{ cat }}" {% if cat == selected_category %}selected{% endif %}>{{ cat }}</option>
                 {% endfor %}
               </select>
-            </div>
-            <div>
-              <div class="field-label">&nbsp;</div>
-              <button class="btn" type="submit">عرض</button>
             </div>
           </div>
         </form>
@@ -529,9 +712,9 @@ def index():
     </div>
 
     <div class="category-chips">
-      <a class="chip {% if not selected_category %}active{% endif %}" href="{{ url_for('index', q=q) }}">الكل</a>
+      <a class="chip {% if not selected_category %}active{% endif %}" href="{{ url_for('index', q=q, lang=lang) }}">{{ tr('all') }}</a>
       {% for cat in categories %}
-        <a class="chip {% if cat == selected_category %}active{% endif %}" href="{{ url_for('index', q=q, category=cat) }}">{{ cat }}</a>
+        <a class="chip {% if cat == selected_category %}active{% endif %}" href="{{ url_for('index', q=q, category=cat, lang=lang) }}">{{ cat }}</a>
       {% endfor %}
     </div>
 
@@ -539,7 +722,7 @@ def index():
       {% for cat, rows in grouped.items() %}
         <div class="section-title">
           <h2>{{ cat }}</h2>
-          <div class="count">{{ rows|length }} صنف</div>
+          <div class="count">{{ rows|length }} {{ tr('items_count') }}</div>
         </div>
         <div class="menu-grid">
           {% for item in rows %}
@@ -549,62 +732,68 @@ def index():
                 <div class="menu-top">
                   <h3 class="menu-name">{{ item['Item Name'] }}</h3>
                   {% if item['Price'] %}
-                    <div class="price">{{ item['Price'] }} د.ع</div>
+                    <div class="price">{{ item['Price'] }} {{ tr('iqd') }}</div>
                   {% endif %}
                 </div>
                 <p class="menu-desc">{{ item['Description'] or '' }}</p>
-                <span class="menu-cat">{{ item['Category'] or 'بدون قسم' }}</span>
+                <span class="menu-cat">{{ item['Category'] or tr('uncategorized') }}</span>
               </div>
             </article>
           {% endfor %}
         </div>
       {% endfor %}
     {% else %}
-      <div class="card">لا توجد أصناف مطابقة.</div>
+      <div class="card">{{ tr('no_items') }}</div>
     {% endif %}
     ''',
     q=q,
     selected_category=selected_category,
     categories=categories,
-    grouped=grouped)
+    grouped=grouped,
+    lang=lang,
+    tr=t)
 
-    return render_page("Menu", content, public_nav=True)
+    return render_page(t("menu"), content, public_nav=True)
 
 
 @app.route("/admin/login", methods=["GET", "POST"])
 def admin_login():
+    get_lang()
+
     if request.method == "POST":
         password = request.form.get("password", "")
         if password == ADMIN_PASSWORD:
             session["is_admin"] = True
-            flash("Logged in.")
-            return redirect(url_for("admin_dashboard"))
-        flash("Wrong password.")
+            flash(t("logged_in"))
+            return redirect(lang_url("admin_dashboard"))
+        flash(t("wrong_password"))
 
     content = render_template_string('''
     <div class="card" style="max-width:500px;margin:60px auto;">
-      <h1 style="margin-top:0">Admin Login</h1>
-      <p class="sub">Enter your admin password.</p>
+      <h1 style="margin-top:0">{{ tr('login_title') }}</h1>
+      <p class="sub">{{ tr('login_sub') }}</p>
       <form method="post">
-        <div class="field-label">Password</div>
-        <input class="input" type="password" name="password" placeholder="Password">
-        <button class="btn" type="submit">Login</button>
+        <div class="field-label">{{ tr('password') }}</div>
+        <input class="input" type="password" name="password" placeholder="{{ tr('password') }}">
+        <button class="btn" type="submit">{{ tr('login') }}</button>
       </form>
-      <p class="tiny">Default password is 1234 unless you change MENU_ADMIN_PASSWORD.</p>
+      <p class="tiny">{{ tr('default_password_hint') }}</p>
     </div>
-    ''')
-    return render_page("Admin Login", content, public_nav=True)
+    ''', tr=t)
+
+    return render_page(t("login_title"), content, public_nav=True)
 
 
 @app.route("/admin/logout")
 def admin_logout():
     session.clear()
-    flash("Logged out.")
-    return redirect(url_for("index"))
+    flash(t("logged_out"))
+    return redirect(lang_url("index"))
 
 
 @app.route("/admin")
 def admin_dashboard():
+    get_lang()
     guard = require_admin()
     if guard:
         return guard
@@ -613,34 +802,37 @@ def admin_dashboard():
     content = render_template_string('''
     <div class="hero">
       <div class="card">
-        <h1 class="headline">Admin Dashboard</h1>
-        <p class="sub">Manage imports, settings, item images, and AI generation from here.</p>
+        <h1 class="headline">{{ tr('admin_dashboard') }}</h1>
+        <p class="sub">{{ tr('admin_dashboard_sub') }}</p>
       </div>
       <div class="card">
         <div class="stats">
-          <div class="stat"><div class="num">{{ items|length }}</div><div class="lbl">Items</div></div>
-          <div class="stat"><div class="num">{{ with_uploads }}</div><div class="lbl">Uploaded images</div></div>
-          <div class="stat"><div class="num">{{ with_ai }}</div><div class="lbl">AI images</div></div>
+          <div class="stat"><div class="num">{{ items|length }}</div><div class="lbl">{{ tr('items') }}</div></div>
+          <div class="stat"><div class="num">{{ with_uploads }}</div><div class="lbl">{{ tr('uploaded_images') }}</div></div>
+          <div class="stat"><div class="num">{{ with_ai }}</div><div class="lbl">{{ tr('ai_images') }}</div></div>
         </div>
       </div>
     </div>
 
     <div class="row2">
-      <a class="card" href="{{ url_for('admin_import') }}"><h2 style="margin-top:0">Import</h2><p class="sub">Import CSV or Google Sheets.</p></a>
-      <a class="card" href="{{ url_for('admin_settings') }}"><h2 style="margin-top:0">Settings</h2><p class="sub">Change title, subtitle, and logo.</p></a>
-      <a class="card" href="{{ url_for('admin_items') }}"><h2 style="margin-top:0">Item Images</h2><p class="sub">Upload manual pictures for each menu item.</p></a>
-      <a class="card" href="{{ url_for('generate_images_page') }}"><h2 style="margin-top:0">AI Images</h2><p class="sub">Generate images automatically if API key works.</p></a>
+      <a class="card" href="{{ lang_url('admin_import') }}"><h2 style="margin-top:0">{{ tr('import') }}</h2><p class="sub">{{ tr('import_menu') }}</p></a>
+      <a class="card" href="{{ lang_url('admin_settings') }}"><h2 style="margin-top:0">{{ tr('settings') }}</h2><p class="sub">{{ tr('site_settings') }}</p></a>
+      <a class="card" href="{{ lang_url('admin_items') }}"><h2 style="margin-top:0">{{ tr('item_images') }}</h2><p class="sub">{{ tr('item_images_sub') }}</p></a>
+      <a class="card" href="{{ lang_url('generate_images_page') }}"><h2 style="margin-top:0">{{ tr('images') }}</h2><p class="sub">{{ tr('ai_images_sub') }}</p></a>
     </div>
     ''',
     items=items,
     with_uploads=sum(1 for item in items if user_uploaded_image_url(item["Item Name"])),
-    with_ai=sum(1 for item in items if ai_generated_image_url(item["Item Name"])))
+    with_ai=sum(1 for item in items if ai_generated_image_url(item["Item Name"])),
+    tr=t,
+    lang_url=lang_url)
 
-    return render_page("Admin Dashboard", content, public_nav=False)
+    return render_page(t("admin_dashboard"), content, public_nav=False)
 
 
 @app.route("/admin/import", methods=["GET", "POST"])
 def admin_import():
+    get_lang()
     guard = require_admin()
     if guard:
         return guard
@@ -651,60 +843,62 @@ def admin_import():
             if mode == "csv":
                 uploaded = request.files.get("csv_file")
                 if not uploaded or not uploaded.filename:
-                    raise ValueError("Choose a CSV file.")
+                    raise ValueError(t("choose_csv"))
                 text = uploaded.read().decode("utf-8-sig", errors="replace")
                 items = parse_csv_text(text)
                 save_menu(items)
-                flash(f"CSV imported: {len(items)} items.")
+                flash(f"{t('csv_imported')}: {len(items)}")
 
             elif mode == "sheet":
                 sheet_url = request.form.get("sheet_url", "").strip()
                 if not sheet_url:
-                    raise ValueError("Paste a Google Sheets URL.")
+                    raise ValueError(t("paste_sheet_url"))
                 text = download_text(sheets_to_csv_url(sheet_url))
                 items = parse_csv_text(text)
                 save_menu(items)
-                flash(f"Google Sheet imported: {len(items)} items.")
+                flash(f"{t('sheet_imported')}: {len(items)}")
 
             else:
-                raise ValueError("Invalid import mode.")
+                raise ValueError(t("invalid_import_mode"))
 
-            return redirect(url_for("admin_dashboard"))
+            return redirect(lang_url("admin_dashboard"))
 
         except Exception as e:
-            flash(f"Import failed: {e}")
-            return redirect(url_for("admin_import"))
+            flash(f"{t('import_failed')}: {e}")
+            return redirect(lang_url("admin_import"))
 
     content = render_template_string('''
-    <div class="card"><h1 style="margin-top:0">Import Menu</h1><p class="sub">Required columns: Category, Item Name, Description, Price</p></div>
+    <div class="card"><h1 style="margin-top:0">{{ tr('import_menu') }}</h1><p class="sub">{{ tr('required_columns') }}</p></div>
 
     <div class="row2">
       <div class="card">
-        <h2 style="margin-top:0">From CSV</h2>
+        <h2 style="margin-top:0">{{ tr('from_csv') }}</h2>
         <form method="post" enctype="multipart/form-data">
           <input type="hidden" name="mode" value="csv">
-          <div class="field-label">CSV file</div>
+          <div class="field-label">{{ tr('csv_file') }}</div>
           <input class="file" type="file" name="csv_file" accept=".csv">
-          <button class="btn" type="submit">Import CSV</button>
+          <button class="btn" type="submit">{{ tr('import_csv') }}</button>
         </form>
       </div>
 
       <div class="card">
-        <h2 style="margin-top:0">From Google Sheets</h2>
+        <h2 style="margin-top:0">{{ tr('from_google_sheets') }}</h2>
         <form method="post">
           <input type="hidden" name="mode" value="sheet">
-          <div class="field-label">Google Sheets URL</div>
-          <input class="input" type="url" name="sheet_url" placeholder="Paste Google Sheets URL">
-          <button class="btn" type="submit">Import Google Sheet</button>
+          <div class="field-label">{{ tr('google_sheets_url') }}</div>
+          <input class="input" type="url" name="sheet_url" placeholder="{{ tr('paste_google_sheet') }}">
+          <button class="btn" type="submit">{{ tr('import_google_sheet') }}</button>
         </form>
       </div>
     </div>
-    ''')
-    return render_page("Admin Import", content, public_nav=False)
+    ''', tr=t)
+
+    return render_page(t("import"), content, public_nav=False)
 
 
 @app.route("/admin/settings", methods=["GET", "POST"])
 def admin_settings():
+    get_lang()
     guard = require_admin()
     if guard:
         return guard
@@ -726,25 +920,25 @@ def admin_settings():
             updates["logo_path"] = f"/uploads/{logo_name}"
 
         save_settings(updates)
-        flash("Settings updated.")
-        return redirect(url_for("admin_settings"))
+        flash(t("settings_updated"))
+        return redirect(lang_url("admin_settings"))
 
     content = render_template_string('''
     <div class="card">
-      <h1 style="margin-top:0">Site Settings</h1>
+      <h1 style="margin-top:0">{{ tr('site_settings') }}</h1>
       <form method="post" enctype="multipart/form-data">
         <div class="row2">
           <div>
-            <div class="field-label">Main title</div>
+            <div class="field-label">{{ tr('main_title') }}</div>
             <input class="input" type="text" name="site_title" value="{{ settings.site_title }}">
           </div>
           <div>
-            <div class="field-label">Subtitle</div>
+            <div class="field-label">{{ tr('subtitle') }}</div>
             <input class="input" type="text" name="site_subtitle" value="{{ settings.site_subtitle }}">
           </div>
         </div>
 
-        <div class="field-label" style="margin-top:10px;">Logo</div>
+        <div class="field-label" style="margin-top:10px;">{{ tr('logo') }}</div>
         <input class="file" type="file" name="logo_file" accept="image/*">
 
         {% if settings.logo_path %}
@@ -753,16 +947,17 @@ def admin_settings():
           </div>
         {% endif %}
 
-        <button class="btn" type="submit">Save Settings</button>
+        <button class="btn" type="submit">{{ tr('save_settings') }}</button>
       </form>
     </div>
-    ''', settings=settings)
+    ''', settings=settings, tr=t)
 
-    return render_page("Admin Settings", content, public_nav=False)
+    return render_page(t("settings"), content, public_nav=False)
 
 
 @app.route("/admin/items", methods=["GET"])
 def admin_items():
+    get_lang()
     guard = require_admin()
     if guard:
         return guard
@@ -770,19 +965,19 @@ def admin_items():
     items = [build_item_view(item) for item in load_menu()]
     content = render_template_string('''
     <div class="card">
-      <h1 style="margin-top:0">Item Images</h1>
-      <p class="sub">Upload a manual picture for any item. Manual upload overrides AI image.</p>
+      <h1 style="margin-top:0">{{ tr('item_images') }}</h1>
+      <p class="sub">{{ tr('item_images_sub') }}</p>
     </div>
 
     <div class="card" style="overflow:auto;">
       <table>
         <thead>
           <tr>
-            <th>Image</th>
-            <th>Item</th>
-            <th>Category</th>
-            <th>Price</th>
-            <th>Upload</th>
+            <th>{{ tr('image') }}</th>
+            <th>{{ tr('item') }}</th>
+            <th>{{ tr('section') }}</th>
+            <th>{{ tr('price') }}</th>
+            <th>{{ tr('upload') }}</th>
           </tr>
         </thead>
         <tbody>
@@ -793,10 +988,10 @@ def admin_items():
             <td>{{ item['Category'] }}</td>
             <td>{{ item['Price'] }}</td>
             <td>
-              <form method="post" action="{{ url_for('admin_upload_item_image') }}" enctype="multipart/form-data">
+              <form method="post" action="{{ lang_url('admin_upload_item_image') }}" enctype="multipart/form-data">
                 <input type="hidden" name="item_name" value="{{ item['Item Name'] }}">
                 <input type="file" name="item_image" accept="image/*" required>
-                <button class="btn secondary" type="submit" style="margin-top:8px;">Upload</button>
+                <button class="btn secondary" type="submit" style="margin-top:8px;">{{ tr('upload') }}</button>
               </form>
             </td>
           </tr>
@@ -804,13 +999,14 @@ def admin_items():
         </tbody>
       </table>
     </div>
-    ''', items=items)
+    ''', items=items, tr=t, lang_url=lang_url)
 
-    return render_page("Admin Items", content, public_nav=False)
+    return render_page(t("items"), content, public_nav=False)
 
 
 @app.route("/admin/upload-item-image", methods=["POST"])
 def admin_upload_item_image():
+    get_lang()
     guard = require_admin()
     if guard:
         return guard
@@ -818,17 +1014,18 @@ def admin_upload_item_image():
     item_name = request.form.get("item_name", "").strip()
     uploaded = request.files.get("item_image")
     if not item_name or not uploaded or not uploaded.filename:
-        flash("Missing item or image.")
-        return redirect(url_for("admin_items"))
+        flash(t("missing_item_or_image"))
+        return redirect(lang_url("admin_items"))
 
     filename = upload_filename_for_item(item_name, uploaded.filename)
     uploaded.save(os.path.join(UPLOAD_DIR, filename))
-    flash(f"Image uploaded for {item_name}.")
-    return redirect(url_for("admin_items"))
+    flash(f"{t('image_uploaded_for')} {item_name}.")
+    return redirect(lang_url("admin_items"))
 
 
 @app.route("/admin/generate-images", methods=["GET", "POST"])
 def generate_images_page():
+    get_lang()
     guard = require_admin()
     if guard:
         return guard
@@ -846,8 +1043,8 @@ def generate_images_page():
 
         client = get_openai_client()
         if client is None:
-            flash("OPENAI_API_KEY not found. Manual uploads will still work.")
-            return redirect(url_for("generate_images_page"))
+            flash(t("openai_key_missing"))
+            return redirect(lang_url("generate_images_page"))
 
         generated = 0
         skipped = 0
@@ -867,39 +1064,38 @@ def generate_images_page():
                 flash(f"Failed on {item['Item Name']}: {e}")
                 break
 
-        flash(f"Images generated: {generated}. Skipped: {skipped}.")
-        return redirect(url_for("generate_images_page"))
+        flash(f"{t('images_generated')}: {generated}. {t('skipped')}: {skipped}.")
+        return redirect(lang_url("generate_images_page"))
 
     preview = [build_item_view(item) for item in items[:12]]
     content = render_template_string('''
     <div class="card">
-      <h1 style="margin-top:0">AI Images</h1>
-      <p class="sub">This page is optional. Manual item upload works even if AI generation fails.</p>
+      <h1 style="margin-top:0">{{ tr('ai_images_title') }}</h1>
+      <p class="sub">{{ tr('ai_images_sub') }}</p>
     </div>
 
     <div class="card">
       <form method="post">
-        <div class="row">
+        <div class="row2">
           <div>
-            <div class="field-label">How many images</div>
+            <div class="field-label">{{ tr('how_many_images') }}</div>
             <input class="input" type="text" name="limit" value="12">
           </div>
           <div>
-            <div class="field-label">Options</div>
+            <div class="field-label">{{ tr('options') }}</div>
             <label style="display:flex;gap:8px;align-items:center;padding:14px;border-radius:16px;border:1px solid var(--line);background:#101014;">
               <input type="checkbox" name="only_missing" checked>
-              <span>Only for items without image</span>
+              <span>{{ tr('only_missing') }}</span>
             </label>
           </div>
-          <div>
-            <div class="field-label">&nbsp;</div>
-            <button class="btn" type="submit">Generate</button>
-          </div>
+        </div>
+        <div style="margin-top:12px;">
+          <button class="btn" type="submit">{{ tr('generate') }}</button>
         </div>
       </form>
     </div>
 
-    <div class="section-title"><h2>Preview</h2><div class="count">{{ preview|length }} items</div></div>
+    <div class="section-title"><h2>{{ tr('preview') }}</h2><div class="count">{{ preview|length }} {{ tr('items_count') }}</div></div>
 
     <div class="menu-grid">
       {% for item in preview %}
@@ -908,17 +1104,17 @@ def generate_images_page():
         <div class="menu-body">
           <div class="menu-top">
             <h3 class="menu-name">{{ item['Item Name'] }}</h3>
-            {% if item['Price'] %}<div class="price">{{ item['Price'] }} د.ع</div>{% endif %}
+            {% if item['Price'] %}<div class="price">{{ item['Price'] }} {{ tr('iqd') }}</div>{% endif %}
           </div>
           <p class="menu-desc">{{ item['Description'] or '' }}</p>
-          <span class="menu-cat">{{ item['Category'] or 'بدون قسم' }}</span>
+          <span class="menu-cat">{{ item['Category'] or tr('uncategorized') }}</span>
         </div>
       </article>
       {% endfor %}
     </div>
-    ''', preview=preview)
+    ''', preview=preview, tr=t)
 
-    return render_page("AI Images", content, public_nav=False)
+    return render_page(t("images"), content, public_nav=False)
 
 
 if __name__ == "__main__":
