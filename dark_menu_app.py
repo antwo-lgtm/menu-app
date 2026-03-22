@@ -30,7 +30,6 @@ ADMIN_PASSWORD = os.environ.get("MENU_ADMIN_PASSWORD", "1234")
 os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
 TRANSLATIONS = {
     "en": {
         "menu": "Menu",
@@ -191,6 +190,14 @@ def t(key):
 def lang_url(endpoint, **kwargs):
     kwargs["lang"] = get_lang()
     return url_for(endpoint, **kwargs)
+
+
+def switch_lang_url(new_lang):
+    args = request.args.to_dict(flat=True)
+    args["lang"] = new_lang
+    view_args = dict(request.view_args or {})
+    endpoint = request.endpoint or "index"
+    return url_for(endpoint, **view_args, **args)
 
 
 def get_openai_client():
@@ -480,8 +487,7 @@ BASE_HTML = r'''
     .brand-badge {
       width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
       background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: black; font-weight: 900;
-      overflow: hidden;
-      flex-shrink: 0;
+      overflow: hidden; flex-shrink: 0;
     }
     .brand-badge img { width: 100%; height: 100%; object-fit: cover; }
     .nav {
@@ -491,10 +497,14 @@ BASE_HTML = r'''
       align-items: center;
     }
     .nav a {
-      padding: 10px 14px; border-radius: 999px; background: #17171a;
-      border: 1px solid var(--line); color: #e4e4e7;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: #17171a;
+      border: 1px solid var(--line);
+      color: #e4e4e7;
     }
-    .nav a.lang-active {
+    .nav a.lang-active,
+    .chip.active {
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
       color: #111;
       border-color: transparent;
@@ -504,8 +514,10 @@ BASE_HTML = r'''
     .hero { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 22px; }
     .card {
       background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-      border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius);
-      box-shadow: var(--shadow); padding: 22px;
+      border: 1px solid rgba(255,255,255,.07);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 22px;
     }
     .headline { font-size: clamp(28px, 4vw, 48px); line-height: 1.05; margin: 0 0 10px; font-weight: 800; }
     .sub { margin: 0; color: var(--muted); line-height: 1.8; font-size: 15px; }
@@ -518,46 +530,80 @@ BASE_HTML = r'''
     .row { display: grid; grid-template-columns: 1.2fr .8fr; gap: 12px; align-items: end; }
     .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
     .input, .select, .btn, .file, textarea {
-      width: 100%; border-radius: 16px; border: 1px solid var(--line);
-      background: #101014; color: var(--text); padding: 13px 14px; font-size: 15px; outline: none;
+      width: 100%;
+      border-radius: 16px;
+      border: 1px solid var(--line);
+      background: #101014;
+      color: var(--text);
+      padding: 13px 14px;
+      font-size: 15px;
+      outline: none;
     }
     textarea { min-height: 120px; resize: vertical; }
     .btn {
-      cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #111; font-weight: 800; border: none; min-width: 140px;
+      cursor: pointer;
+      background: linear-gradient(135deg, var(--accent), var(--accent-2));
+      color: #111;
+      font-weight: 800;
+      border: none;
+      min-width: 140px;
     }
     .btn.secondary { background: #17171a; color: var(--text); border: 1px solid var(--line); }
     .flash {
-      background: rgba(234,179,8,.12); color: #fcd34d; border: 1px solid rgba(234,179,8,.25);
-      padding: 12px 14px; border-radius: 14px; margin-bottom: 16px;
+      background: rgba(234,179,8,.12);
+      color: #fcd34d;
+      border: 1px solid rgba(234,179,8,.25);
+      padding: 12px 14px;
+      border-radius: 14px;
+      margin-bottom: 16px;
     }
     .category-chips { display: flex; gap: 10px; overflow: auto; padding-bottom: 4px; margin: 16px 0 18px; }
     .chip {
-      white-space: nowrap; padding: 11px 15px; border-radius: 999px; background: #141418;
-      border: 1px solid var(--line); color: #d4d4d8; display: inline-flex; align-items: center; gap: 8px;
+      white-space: nowrap;
+      padding: 11px 15px;
+      border-radius: 999px;
+      background: #141418;
+      border: 1px solid var(--line);
+      color: #d4d4d8;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
     }
-    .chip.active { background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: #111; border-color: transparent; font-weight: 800; }
     .section-title { margin: 34px 0 12px; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
     .section-title h2 { margin: 0; font-size: 26px; }
     .section-title .count { color: var(--muted); font-size: 13px; }
     .menu-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap: 16px; }
     .menu-item {
-      overflow: hidden; border-radius: 22px;
+      overflow: hidden;
+      border-radius: 22px;
       background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-      border: 1px solid rgba(255,255,255,.07); box-shadow: var(--shadow);
+      border: 1px solid rgba(255,255,255,.07);
+      box-shadow: var(--shadow);
     }
     .menu-image { width: 100%; aspect-ratio: 1 / 1; object-fit: cover; display: block; background: #0f0f12; }
     .menu-body { padding: 14px 14px 16px; }
     .menu-top { display: flex; justify-content: space-between; gap: 10px; align-items: start; margin-bottom: 8px; }
     .menu-name { margin: 0; font-size: 18px; line-height: 1.5; font-weight: 800; }
     .price {
-      white-space: nowrap; padding: 7px 10px; border-radius: 999px; background: rgba(234,179,8,.12);
-      color: #fcd34d; border: 1px solid rgba(234,179,8,.18); font-weight: 800; font-size: 14px;
+      white-space: nowrap;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(234,179,8,.12);
+      color: #fcd34d;
+      border: 1px solid rgba(234,179,8,.18);
+      font-weight: 800;
+      font-size: 14px;
     }
     .menu-desc { margin: 0; color: var(--muted); line-height: 1.7; min-height: 24px; font-size: 14px; }
     .menu-cat {
-      display: inline-block; margin-top: 12px; padding: 7px 10px; border-radius: 999px;
-      background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); color: #d4d4d8; font-size: 12px;
+      display: inline-block;
+      margin-top: 12px;
+      padding: 7px 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,.04);
+      border: 1px solid rgba(255,255,255,.06);
+      color: #d4d4d8;
+      font-size: 12px;
     }
     table { width: 100%; border-collapse: collapse; }
     th, td { padding: 12px 10px; border-bottom: 1px solid rgba(255,255,255,.08); text-align: start; vertical-align: top; }
@@ -590,8 +636,8 @@ BASE_HTML = r'''
     </div>
 
     <div class="nav">
-      <a href="{{ url_for(request.endpoint, **request.view_args, lang='ar', **request.args.to_dict(flat=True)) if request.endpoint else url_for('index', lang='ar') }}" class="{% if lang == 'ar' %}lang-active{% endif %}">العربية</a>
-      <a href="{{ url_for(request.endpoint, **request.view_args, lang='en', **request.args.to_dict(flat=True)) if request.endpoint else url_for('index', lang='en') }}" class="{% if lang == 'en' %}lang-active{% endif %}">English</a>
+      <a href="{{ switch_lang_url('ar') }}" class="{% if lang == 'ar' %}lang-active{% endif %}">العربية</a>
+      <a href="{{ switch_lang_url('en') }}" class="{% if lang == 'en' %}lang-active{% endif %}">English</a>
 
       {% if not public_nav %}
         <a href="{{ lang_url('index') }}">{{ tr('public_menu') }}</a>
@@ -632,7 +678,7 @@ def render_page(title, content, public_nav=True):
         lang=get_lang(),
         tr=t,
         lang_url=lang_url,
-        request=request,
+        switch_lang_url=switch_lang_url,
     )
 
 
