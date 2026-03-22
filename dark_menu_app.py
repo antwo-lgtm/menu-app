@@ -227,6 +227,7 @@ def generate_item_image(item_name, category):
     client = get_openai_client()
     if client is None:
         return None
+
     filename = image_filename_for_item(item_name)
     path = os.path.join(IMAGE_DIR, filename)
     if os.path.exists(path):
@@ -246,6 +247,7 @@ def generate_item_image(item_name, category):
         with open(path, "wb") as f:
             f.write(base64.b64decode(image_b64))
         return f"/images/{filename}"
+
     if image_url:
         req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
         with urllib.request.urlopen(req, timeout=60) as resp:
@@ -253,6 +255,7 @@ def generate_item_image(item_name, category):
         with open(path, "wb") as f:
             f.write(data)
         return f"/images/{filename}"
+
     return None
 
 
@@ -315,6 +318,7 @@ BASE_HTML = r'''
       width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
       background: linear-gradient(135deg, var(--accent), var(--accent-2)); color: black; font-weight: 900;
       overflow: hidden;
+      flex-shrink: 0;
     }
     .brand-badge img { width: 100%; height: 100%; object-fit: cover; }
     .nav { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -323,7 +327,7 @@ BASE_HTML = r'''
       border: 1px solid var(--line); color: #e4e4e7;
     }
     .container { max-width: 1320px; margin: 0 auto; padding: 24px 16px 40px; }
-    .hero { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; margin-bottom: 22px; }
+    .hero { display: grid; grid-template-columns: 1fr; gap: 18px; margin-bottom: 22px; }
     .card {
       background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
       border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius);
@@ -386,8 +390,11 @@ BASE_HTML = r'''
     th { color: var(--muted); font-size: 13px; }
     .thumb { width: 56px; height: 56px; border-radius: 12px; object-fit: cover; background: #111; }
     .tiny { color: var(--muted); font-size: 12px; line-height: 1.7; }
-    .footer { margin-top: 28px; color: var(--muted); text-align: center; font-size: 13px; padding: 14px; }
-    @media (max-width: 980px) { .hero, .row, .row2 { grid-template-columns: 1fr; } .stats { grid-template-columns: 1fr; } }
+
+    @media (max-width: 980px) {
+      .row, .row2 { grid-template-columns: 1fr; }
+      .stats { grid-template-columns: 1fr; }
+    }
   </style>
 </head>
 <body>
@@ -402,11 +409,14 @@ BASE_HTML = r'''
       </div>
       <div>
         <div style="font-weight:800">{{ settings.site_title }}</div>
-        <div style="font-size:12px;color:var(--muted)">{{ settings.site_subtitle }}</div>
+        {% if not public_nav %}
+          <div style="font-size:12px;color:var(--muted)">{{ settings.site_subtitle }}</div>
+        {% endif %}
       </div>
     </div>
+
     <div class="nav">
-      {% else %}
+      {% if not public_nav %}
         <a href="{{ url_for('index') }}">Public Menu</a>
         <a href="{{ url_for('admin_dashboard') }}">Dashboard</a>
         <a href="{{ url_for('admin_import') }}">Import</a>
@@ -417,6 +427,7 @@ BASE_HTML = r'''
       {% endif %}
     </div>
   </div>
+
   <div class="container">
     {% with messages = get_flashed_messages() %}
       {% if messages %}
@@ -433,7 +444,13 @@ BASE_HTML = r'''
 
 
 def render_page(title, content, public_nav=True):
-    return render_template_string(BASE_HTML, title=title, content=content, settings=load_settings(), public_nav=public_nav)
+    return render_template_string(
+        BASE_HTML,
+        title=title,
+        content=content,
+        settings=load_settings(),
+        public_nav=public_nav
+    )
 
 
 @app.route("/images/<path:filename>")
@@ -462,12 +479,20 @@ def index():
 
     filtered = []
     for item in items:
-        blob = " ".join([item.get("Category", ""), item.get("Item Name", ""), item.get("Description", ""), item.get("Price", "")]).lower()
+        blob = " ".join([
+            item.get("Category", ""),
+            item.get("Item Name", ""),
+            item.get("Description", ""),
+            item.get("Price", "")
+        ]).lower()
+
         if q and q not in blob:
             continue
+
         actual_cat = item.get("Category") or "بدون قسم"
         if selected_category and actual_cat != selected_category:
             continue
+
         filtered.append(item)
 
     grouped = OrderedDict()
@@ -478,15 +503,6 @@ def index():
 
     content = render_template_string('''
     <div class="hero">
-      <div class="card">
-        <h1 class="headline">{{ settings.site_title }}</h1>
-        <p class="sub">{{ settings.site_subtitle }}</p>
-        <div class="stats">
-          <div class="stat"><div class="num">{{ total_items }}</div><div class="lbl">عدد الأصناف</div></div>
-          <div class="stat"><div class="num">{{ total_categories }}</div><div class="lbl">عدد الأقسام</div></div>
-          <div class="stat"><div class="num">{{ with_images }}</div><div class="lbl">صور جاهزة</div></div>
-        </div>
-      </div>
       <div class="card search-card">
         <form method="get">
           <div class="row">
@@ -546,7 +562,12 @@ def index():
     {% else %}
       <div class="card">لا توجد أصناف مطابقة.</div>
     {% endif %}
-    ''', settings=load_settings(), q=q, selected_category=selected_category, categories=categories, grouped=grouped, total_items=len(items), total_categories=len(categories), with_images=sum(1 for item in items if user_uploaded_image_url(item["Item Name"]) or ai_generated_image_url(item["Item Name"])))
+    ''',
+    q=q,
+    selected_category=selected_category,
+    categories=categories,
+    grouped=grouped)
+
     return render_page("Menu", content, public_nav=True)
 
 
@@ -559,6 +580,7 @@ def admin_login():
             flash("Logged in.")
             return redirect(url_for("admin_dashboard"))
         flash("Wrong password.")
+
     content = render_template_string('''
     <div class="card" style="max-width:500px;margin:60px auto;">
       <h1 style="margin-top:0">Admin Login</h1>
@@ -586,6 +608,7 @@ def admin_dashboard():
     guard = require_admin()
     if guard:
         return guard
+
     items = load_menu()
     content = render_template_string('''
     <div class="hero">
@@ -601,13 +624,18 @@ def admin_dashboard():
         </div>
       </div>
     </div>
+
     <div class="row2">
       <a class="card" href="{{ url_for('admin_import') }}"><h2 style="margin-top:0">Import</h2><p class="sub">Import CSV or Google Sheets.</p></a>
       <a class="card" href="{{ url_for('admin_settings') }}"><h2 style="margin-top:0">Settings</h2><p class="sub">Change title, subtitle, and logo.</p></a>
       <a class="card" href="{{ url_for('admin_items') }}"><h2 style="margin-top:0">Item Images</h2><p class="sub">Upload manual pictures for each menu item.</p></a>
       <a class="card" href="{{ url_for('generate_images_page') }}"><h2 style="margin-top:0">AI Images</h2><p class="sub">Generate images automatically if API key works.</p></a>
     </div>
-    ''', items=items, with_uploads=sum(1 for item in items if user_uploaded_image_url(item["Item Name"])), with_ai=sum(1 for item in items if ai_generated_image_url(item["Item Name"])))
+    ''',
+    items=items,
+    with_uploads=sum(1 for item in items if user_uploaded_image_url(item["Item Name"])),
+    with_ai=sum(1 for item in items if ai_generated_image_url(item["Item Name"])))
+
     return render_page("Admin Dashboard", content, public_nav=False)
 
 
@@ -616,6 +644,7 @@ def admin_import():
     guard = require_admin()
     if guard:
         return guard
+
     if request.method == "POST":
         mode = request.form.get("mode")
         try:
@@ -627,6 +656,7 @@ def admin_import():
                 items = parse_csv_text(text)
                 save_menu(items)
                 flash(f"CSV imported: {len(items)} items.")
+
             elif mode == "sheet":
                 sheet_url = request.form.get("sheet_url", "").strip()
                 if not sheet_url:
@@ -635,15 +665,19 @@ def admin_import():
                 items = parse_csv_text(text)
                 save_menu(items)
                 flash(f"Google Sheet imported: {len(items)} items.")
+
             else:
                 raise ValueError("Invalid import mode.")
+
             return redirect(url_for("admin_dashboard"))
+
         except Exception as e:
             flash(f"Import failed: {e}")
             return redirect(url_for("admin_import"))
 
     content = render_template_string('''
     <div class="card"><h1 style="margin-top:0">Import Menu</h1><p class="sub">Required columns: Category, Item Name, Description, Price</p></div>
+
     <div class="row2">
       <div class="card">
         <h2 style="margin-top:0">From CSV</h2>
@@ -654,6 +688,7 @@ def admin_import():
           <button class="btn" type="submit">Import CSV</button>
         </form>
       </div>
+
       <div class="card">
         <h2 style="margin-top:0">From Google Sheets</h2>
         <form method="post">
@@ -673,12 +708,14 @@ def admin_settings():
     guard = require_admin()
     if guard:
         return guard
+
     settings = load_settings()
     if request.method == "POST":
         updates = {
             "site_title": request.form.get("site_title", "").strip() or settings["site_title"],
             "site_subtitle": request.form.get("site_subtitle", "").strip() or settings["site_subtitle"],
         }
+
         logo = request.files.get("logo_file")
         if logo and logo.filename:
             safe = secure_filename_local(logo.filename)
@@ -687,6 +724,7 @@ def admin_settings():
             logo_path = os.path.join(UPLOAD_DIR, logo_name)
             logo.save(logo_path)
             updates["logo_path"] = f"/uploads/{logo_name}"
+
         save_settings(updates)
         flash("Settings updated.")
         return redirect(url_for("admin_settings"))
@@ -705,15 +743,21 @@ def admin_settings():
             <input class="input" type="text" name="site_subtitle" value="{{ settings.site_subtitle }}">
           </div>
         </div>
+
         <div class="field-label" style="margin-top:10px;">Logo</div>
         <input class="file" type="file" name="logo_file" accept="image/*">
+
         {% if settings.logo_path %}
-          <div style="margin:14px 0;"><img src="{{ settings.logo_path }}" alt="Logo" style="width:90px;height:90px;object-fit:cover;border-radius:16px;"></div>
+          <div style="margin:14px 0;">
+            <img src="{{ settings.logo_path }}" alt="Logo" style="width:90px;height:90px;object-fit:cover;border-radius:16px;">
+          </div>
         {% endif %}
+
         <button class="btn" type="submit">Save Settings</button>
       </form>
     </div>
     ''', settings=settings)
+
     return render_page("Admin Settings", content, public_nav=False)
 
 
@@ -722,12 +766,14 @@ def admin_items():
     guard = require_admin()
     if guard:
         return guard
+
     items = [build_item_view(item) for item in load_menu()]
     content = render_template_string('''
     <div class="card">
       <h1 style="margin-top:0">Item Images</h1>
       <p class="sub">Upload a manual picture for any item. Manual upload overrides AI image.</p>
     </div>
+
     <div class="card" style="overflow:auto;">
       <table>
         <thead>
@@ -759,6 +805,7 @@ def admin_items():
       </table>
     </div>
     ''', items=items)
+
     return render_page("Admin Items", content, public_nav=False)
 
 
@@ -767,11 +814,13 @@ def admin_upload_item_image():
     guard = require_admin()
     if guard:
         return guard
+
     item_name = request.form.get("item_name", "").strip()
     uploaded = request.files.get("item_image")
     if not item_name or not uploaded or not uploaded.filename:
         flash("Missing item or image.")
         return redirect(url_for("admin_items"))
+
     filename = upload_filename_for_item(item_name, uploaded.filename)
     uploaded.save(os.path.join(UPLOAD_DIR, filename))
     flash(f"Image uploaded for {item_name}.")
@@ -783,14 +832,18 @@ def generate_images_page():
     guard = require_admin()
     if guard:
         return guard
+
     items = load_menu()
+
     if request.method == "POST":
         limit_raw = request.form.get("limit", "12").strip()
         only_missing = request.form.get("only_missing") == "on"
+
         try:
             limit = max(1, min(100, int(limit_raw)))
         except Exception:
             limit = 12
+
         client = get_openai_client()
         if client is None:
             flash("OPENAI_API_KEY not found. Manual uploads will still work.")
@@ -798,18 +851,22 @@ def generate_images_page():
 
         generated = 0
         skipped = 0
+
         for item in items:
             if generated >= limit:
                 break
+
             if only_missing and (user_uploaded_image_url(item["Item Name"]) or ai_generated_image_url(item["Item Name"])):
                 skipped += 1
                 continue
+
             try:
                 if generate_item_image(item["Item Name"], item["Category"]):
                     generated += 1
             except Exception as e:
                 flash(f"Failed on {item['Item Name']}: {e}")
                 break
+
         flash(f"Images generated: {generated}. Skipped: {skipped}.")
         return redirect(url_for("generate_images_page"))
 
@@ -819,6 +876,7 @@ def generate_images_page():
       <h1 style="margin-top:0">AI Images</h1>
       <p class="sub">This page is optional. Manual item upload works even if AI generation fails.</p>
     </div>
+
     <div class="card">
       <form method="post">
         <div class="row">
@@ -840,7 +898,9 @@ def generate_images_page():
         </div>
       </form>
     </div>
+
     <div class="section-title"><h2>Preview</h2><div class="count">{{ preview|length }} items</div></div>
+
     <div class="menu-grid">
       {% for item in preview %}
       <article class="menu-item">
@@ -857,6 +917,7 @@ def generate_images_page():
       {% endfor %}
     </div>
     ''', preview=preview)
+
     return render_page("AI Images", content, public_nav=False)
 
 
