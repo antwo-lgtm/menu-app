@@ -34,7 +34,6 @@ LANGUAGES = {
         "placeholder": "Search for dish or category...",
         "no_items": "No items found.",
         "price_suffix": "IQD",
-        "categories_label": "Categories"
     }},
     "ar": {"name": "العربية", "table": "items_ar", "labels": {
         "search": "بحث",
@@ -43,7 +42,6 @@ LANGUAGES = {
         "placeholder": "ابحث عن صنف أو قسم...",
         "no_items": "لا توجد أصناف مطابقة.",
         "price_suffix": "د.ع",
-        "categories_label": "الأقسام"
     }},
     "ku": {"name": "Kurdî", "table": "items_ku", "labels": {
         "search": "Lêgerîn",
@@ -52,7 +50,6 @@ LANGUAGES = {
         "placeholder": "Navê xwarinê an beşê binivîse...",
         "no_items": "Tişt nehate dîtin.",
         "price_suffix": "IQD",
-        "categories_label": "Beş"
     }}
 }
 DEFAULT_LANG = "en"
@@ -136,13 +133,8 @@ def best_image_url(item_name, lang):
     uploaded = user_uploaded_image_url(item_name, lang)
     if uploaded:
         return uploaded
-    # No fallback; show a placeholder via CSS or a default image
-    return "/static/placeholder.png"   # we'll serve a default image
-
-# We'll serve a default placeholder from static folder
-@app.route("/static/<path:filename>")
-def serve_static(filename):
-    return send_from_directory("static", filename)
+    # No fallback; show a placeholder via CSS (inline SVG)
+    return "/static/placeholder.svg"
 
 def is_admin():
     return session.get("is_admin") is True
@@ -315,24 +307,24 @@ def admin_items(lang):
         </thead>
         <tbody>
           {% for item in items %}
-          <tr>
-            <td><img class="thumb" src="{{ item.image_url }}" alt="{{ item.name }}"></td>
-            <td>{{ item.category }}</td>
-            <td>{{ item.name }}</td>
-            <td>{{ item.description or '' }}</td>
-            <td>{{ item.price or '' }}</td>
-            <td>
+           <tr>
+             <td><img class="thumb" src="{{ item.image_url }}" alt="{{ item.name }}"></td>
+             <td>{{ item.category }}</td>
+             <td>{{ item.name }}</td>
+             <td>{{ item.description or '' }}</td>
+             <td>{{ item.price or '' }}</td>
+             <td>
               <a href="{{ url_for('admin_edit_item', lang=lang, item_id=item.id) }}" class="btn secondary small">Edit</a>
               <a href="{{ url_for('admin_delete_item', lang=lang, item_id=item.id) }}" class="btn secondary small" onclick="return confirm('Delete this item?')">Delete</a>
               <form method="post" action="{{ url_for('admin_upload_item_image', lang=lang, item_id=item.id) }}" enctype="multipart/form-data" style="display:inline-block;">
                 <input type="file" name="item_image" accept="image/*" style="display:none;" onchange="this.form.submit()" id="file-{{ item.id }}">
                 <button class="btn secondary small" type="button" onclick="document.getElementById('file-{{ item.id }}').click();">Upload</button>
               </form>
-            </td>
-          </tr>
+             </td>
+           </tr>
           {% endfor %}
         </tbody>
-      </table>
+       </table>
     </div>
     ''', lang=lang, lang_name=LANGUAGES[lang]["name"], items=items)
     return render_page(f"Items ({LANGUAGES[lang]['name']})", content, public_nav=False)
@@ -664,7 +656,7 @@ def index():
         <div class="menu-grid">
           {% for item in rows %}
             <div class="menu-item">
-              <img class="menu-image" src="{{ item.image_url }}" alt="{{ item.name }}">
+              <img class="menu-image" src="{{ item.image_url }}" alt="{{ item.name }}" onerror="this.src='/static/placeholder.svg';">
               <div class="menu-body">
                 <div class="menu-top">
                   <h3 class="menu-name">{{ item.name }}</h3>
@@ -710,13 +702,15 @@ def index():
 def serve_image(filename):
     return send_from_directory(IMAGE_DIR, filename)
 
-# Create a default placeholder image if it doesn't exist
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    return send_from_directory("static", filename)
+
+# Create a simple placeholder SVG
 os.makedirs("static", exist_ok=True)
-placeholder_path = os.path.join("static", "placeholder.png")
-if not os.path.exists(placeholder_path):
-    from PIL import Image
-    img = Image.new('RGB', (400, 400), color=(30, 30, 35))
-    img.save(placeholder_path)
+placeholder_svg = '''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="400" height="400"><rect width="400" height="400" fill="#1a1a1e"/><text x="200" y="200" text-anchor="middle" fill="#6b7280" font-size="20">No image</text></svg>'''
+with open(os.path.join("static", "placeholder.svg"), "w", encoding="utf-8") as f:
+    f.write(placeholder_svg)
 
 # ----------------------------------------------------------------------
 # Base template and rendering
