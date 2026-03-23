@@ -2,16 +2,15 @@ import os, csv, hashlib, urllib.parse, io
 from flask import Flask, request, redirect, url_for, render_template_string, session, send_from_directory
 
 app = Flask(__name__)
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "triple-gold-uniform-2026")
+app.secret_key = os.environ.get("FLASK_SECRET_KEY", "ultra-menu-sync-2026")
 
-# --- CONFIG ---
+# --- CONFIGURATION ---
 DATA_FILE = "menu_data.csv"
 UPLOAD_DIR = "uploaded_assets"
-LOGO_FILENAME = "restaurant_logo_file" 
-ADMIN_PASSWORD = os.environ.get("MENU_ADMIN_PASSWORD", "1234")
+LOGO_FILENAME = "restaurant_logo_file"
+ADMIN_PASSWORD = "1234" # Change this for production!
 ALLOWED_EXTENSIONS = {'png', 'jpg', 'jpeg', 'webp'}
 
-# Internal Database columns
 INTERNAL_COLS = [
     "Category_EN", "Category_AR", "Category_KU",
     "Item_EN", "Item_AR", "Item_KU",
@@ -21,7 +20,7 @@ INTERNAL_COLS = [
 
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-# --- CORE UTILS ---
+# --- DATABASE UTILS ---
 def load_menu():
     if not os.path.exists(DATA_FILE): return []
     items = []
@@ -49,158 +48,180 @@ def get_logo_url():
     return None
 
 def get_image_url(item_name_en):
+    # Check for custom upload first
     digest = hashlib.sha1(item_name_en.encode("utf-8")).hexdigest()[:16]
     for ext in ALLOWED_EXTENSIONS:
         if os.path.exists(os.path.join(UPLOAD_DIR, f"{digest}.{ext}")):
             return f"/uploads/{digest}.{ext}"
-    q = urllib.parse.quote(item_name_en + " food dish")
-    return f"https://source.unsplash.com/800x800/?food,{q}"
+    # Fallback to Unsplash
+    q = urllib.parse.quote(item_name_en + " food")
+    return f"https://images.unsplash.com/photo-1546069901-ba9599a7e63c?w=500&q=80" # Default food placeholder
 
-# --- THE UNIFORM SYNC LOGIC ---
-def process_uniform_csv(file_stream, lang_code):
-    """
-    Processes CSV with structure: Category, Name, Description, Price
-    lang_code: 'EN', 'AR', or 'KU'
-    """
+# --- SYNC ENGINE (Matches by Row Position) ---
+def sync_language_csv(file_stream, lang_code):
     stream = io.StringIO(file_stream.read().decode("utf-8-sig"))
     reader = csv.reader(stream)
-    next(reader, None) # Skip Header Row
+    next(reader, None) # Skip Header
     
     current_items = load_menu()
+    rows = list(reader)
     
-    for row in reader:
-        if len(row) < 2: continue # Ensure it has at least Category and Name
-        
-        in_cat = row[0].strip()
-        in_name = row[1].strip()
-        in_desc = row[2].strip() if len(row) > 2 else ""
-        in_price = row[3].strip() if len(row) > 3 else ""
+    # Ensure database has enough rows to match the CSV
+    while len(current_items) < len(rows):
+        current_items.append({col: "" for col in INTERNAL_COLS})
 
-        found = False
-        # Try to find existing item to merge
-        for item in current_items:
-            # We always match against the English Name (Item_EN) 
-            # This assumes your AR/KU files use the English name in the 'Name' column 
-            # to identify which item they are translating.
-            if item["Item_EN"].lower() == in_name.lower():
-                item[f"Category_{lang_code}"] = in_cat
-                item[f"Item_{lang_code}"] = in_name # This stores the translated name
-                item[f"Description_{lang_code}"] = in_desc
-                if in_price: item["Price"] = in_price
-                found = True
-                break
+    for idx, row in enumerate(rows):
+        if len(row) < 2: continue
         
-        if not found:
-            # Item doesn't exist, create it.
-            new_item = {col: "" for col in INTERNAL_COLS}
-            new_item[f"Category_{lang_code}"] = in_cat
-            new_item[f"Item_{lang_code}"] = in_name
-            new_item[f"Description_{lang_code}"] = in_desc
-            new_item["Price"] = in_price
-            new_item["Status"] = "Available"
-            
-            # If this is the EN file, it becomes the Master ID
-            if lang_code == "EN":
-                new_item["Item_EN"] = in_name
-            else:
-                # If uploading translations first, we still need a Master ID
-                new_item["Item_EN"] = in_name 
-                
-            current_items.append(new_item)
-            
+        # Structure: 0:Category, 1:Name, 2:Description, 3:Price
+        current_items[idx][f"Category_{lang_code}"] = row[0].strip()
+        current_items[idx][f"Item_{lang_code}"] = row[1].strip()
+        current_items[idx][f"Description_{lang_code}"] = row[2].strip() if len(row) > 2 else ""
+        
+        # Only English file or first upload usually sets the Price
+        if len(row) > 3 and row[3].strip():
+            current_items[idx]["Price"] = row[3].strip()
+        
+        if not current_items[idx]["Status"]:
+            current_items[idx]["Status"] = "Available"
+
     save_menu(current_items)
 
-# --- TRANSLATION MAP ---
-LANG_MAP = {
-    'en': {'dir': 'ltr', 'search': 'Search...', 'all': 'All', 'price': 'IQD', 'sold': 'SOLD OUT'},
-    'ar': {'dir': 'rtl', 'search': 'بحث...', 'all': 'الكل', 'price': 'د.ع', 'sold': 'نفذت'},
-    'ku': {'dir': 'rtl', 'search': 'گەڕان...', 'all': 'هەموو', 'price': 'د.ع', 'sold': 'نەماوە'}
-}
-
-# --- HTML TEMPLATES ---
-# (Includes the Sidebar/Layout logic from previous versions)
+# --- FRONTEND TEMPLATE ---
+PUBLIC_HTML = r'''
+<!doctype html>
+<html lang="{{ lang }}" dir="{{ 'rtl' if lang in ['ar', 'ku'] else 'ltr' }}">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Premium Menu</title>
+  <style>
+    :root { --gold: #c5a059; --bg: #0c0c0d; --card: #141415; --text: #ffffff; --muted: #888; }
+    body { background: var(--bg); color: var(--text); font-family: sans-serif; margin: 0; padding-bottom: 50px; }
+    .header { text-align: center; padding: 40px 20px; border-bottom: 1px solid #222; }
+    .logo-img { max-height: 100px; margin-bottom: 10px; }
+    .lang-switcher { display: flex; justify-content: center; gap: 15px; margin-top: 15px; }
+    .lang-switcher a { color: var(--muted); text-decoration: none; font-weight: bold; font-size: 14px; }
+    .lang-switcher a.active { color: var(--gold); border-bottom: 2px solid var(--gold); }
+    .cats { display: flex; gap: 10px; overflow-x: auto; padding: 20px; sticky; top: 0; background: var(--bg); z-index: 10; }
+    .cat-chip { padding: 8px 20px; border-radius: 50px; border: 1px solid #333; white-space: nowrap; cursor: pointer; color: var(--muted); }
+    .cat-chip.active { background: var(--gold); color: black; border-color: var(--gold); font-weight: bold; }
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 20px; }
+    .item-card { background: var(--card); border-radius: 15px; overflow: hidden; border: 1px solid #222; position: relative; }
+    .item-card img { width: 100%; aspect-ratio: 1/1; object-fit: cover; }
+    .item-info { padding: 15px; }
+    .price { color: var(--gold); font-weight: bold; }
+    .sold-out { opacity: 0.5; filter: grayscale(1); }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="header">
+    {% if logo_url %}<img src="{{ logo_url }}" class="logo-img">{% else %}<h1 style="color:var(--gold)">RESTAURANT</h1>{% endif %}
+    <div class="lang-switcher">
+      <a href="?l=en" class="{{ 'active' if lang=='en' }}">English</a>
+      <a href="?l=ar" class="{{ 'active' if lang=='ar' }}">عربي</a>
+      <a href="?l=ku" class="{{ 'active' if lang=='ku' }}">کوردی</a>
+    </div>
+  </div>
+  <div class="cats">
+    <div class="cat-chip active" data-c="all">All</div>
+    {% for c in categories %}<div class="cat-chip" data-c="{{ c }}">{{ c }}</div>{% endfor %}
+  </div>
+  <div class="grid">
+    {% for i in items %}
+    <div class="item-card {{ 'sold-out' if i.Status != 'Available' }}" data-cat="{{ i['Category_' ~ lang|upper] }}">
+      <img src="{{ i.image }}">
+      <div class="item-info">
+        <div style="display:flex; justify-content:space-between;">
+          <h3 style="margin:0;">{{ i['Item_' ~ lang|upper] or i['Item_EN'] }}</h3>
+          <span class="price">{{ i.Price }}</span>
+        </div>
+        <p style="color:var(--muted); font-size:14px;">{{ i['Description_' ~ lang|upper] or i['Description_EN'] }}</p>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  <script>
+    const chips = document.querySelectorAll('.cat-chip');
+    const cards = document.querySelectorAll('.item-card');
+    chips.forEach(b => b.addEventListener('click', () => {
+      chips.forEach(x => x.classList.remove('active'));
+      b.classList.add('active');
+      const cat = b.dataset.c;
+      cards.forEach(c => c.hidden = (cat !== 'all' && c.dataset.cat !== cat));
+    }));
+  </script>
+</body>
+</html>
+'''
 
 ADMIN_HTML = r'''
 <!doctype html>
 <html>
-<head><meta charset="utf-8"><title>Restaurant Admin Gold</title>
+<head><meta charset="utf-8"><title>Admin Panel</title>
 <style>
-    body { font-family: sans-serif; background: #0a0a0b; color: #eee; padding: 30px; line-height: 1.6; }
-    .container { max-width: 1000px; margin: auto; }
-    .card { background: #161618; border: 1px solid #2a2a2c; padding: 25px; border-radius: 12px; margin-bottom: 25px; }
-    .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-    .btn { padding: 12px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; width: 100%; transition: 0.2s; }
-    .btn:hover { opacity: 0.8; }
-    .en { background: #3b82f6; color: white; }
-    .ar { background: #10b981; color: white; }
-    .ku { background: #f59e0b; color: white; }
-    .logo-btn { background: #c5a059; color: black; margin-top: 10px; width: auto; padding: 10px 30px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-    th { text-align: left; font-size: 12px; color: #666; padding: 10px; border-bottom: 2px solid #222; }
-    td { padding: 15px; border-bottom: 1px solid #222; font-size: 14px; }
-    .status-badge { font-size: 10px; padding: 2px 8px; border-radius: 4px; background: #333; }
+  body { font-family: sans-serif; background: #0a0a0b; color: white; padding: 40px; }
+  .card { background: #161618; border: 1px solid #2a2a2c; padding: 25px; border-radius: 12px; margin-bottom: 20px; }
+  .btn { padding: 12px 24px; border-radius: 6px; border: none; font-weight: bold; cursor: pointer; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+  input[type="file"] { background: #000; padding: 10px; width: 100%; box-sizing: border-box; border-radius: 6px; border: 1px solid #333; color: #888; }
+  table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+  td, th { padding: 12px; border-bottom: 1px solid #222; text-align: left; }
 </style>
 </head>
 <body>
-    <div class="container">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-            <h1>Menu Control Center</h1>
-            <a href="/admin/logout" style="color:#ef4444; text-decoration:none; font-weight:bold;">Exit</a>
-        </div>
+  <div style="display:flex; justify-content:space-between; align-items:center;">
+    <h1>Admin Control</h1>
+    <a href="/admin/logout" style="color:red;">Logout</a>
+  </div>
 
-        <div class="card">
-            <h3>1. Branding</h3>
-            <form action="/admin/upload_logo" method="post" enctype="multipart/form-data">
-                <input type="file" name="logo_file" accept="image/*" required>
-                <button class="btn logo-btn">Upload Header Logo</button>
-            </form>
-        </div>
+  <div class="card">
+    <h3>1. Restaurant Logo</h3>
+    <form action="/admin/upload_logo" method="post" enctype="multipart/form-data">
+      <input type="file" name="logo_file" required>
+      <button class="btn" style="background:#c5a059; margin-top:10px;">Save Logo</button>
+    </form>
+  </div>
 
-        <div class="card">
-            <h3>2. Triple CSV Sync (Uniform Structure)</h3>
-            <p style="color:#888; font-size:13px;">Requirement: 4 columns in each file (Category, Name, Description, Price).</p>
-            <div class="grid">
-                <div class="card" style="background:#1c1c1e;">
-                    <h4 style="margin-top:0;">English (Master)</h4>
-                    <form action="/admin/sync/EN" method="post" enctype="multipart/form-data">
-                        <input type="file" name="csv_file" required>
-                        <button class="btn en">Sync EN</button>
-                    </form>
-                </div>
-                <div class="card" style="background:#1c1c1e;">
-                    <h4 style="margin-top:0;">Arabic</h4>
-                    <form action="/admin/sync/AR" method="post" enctype="multipart/form-data">
-                        <input type="file" name="csv_file" required>
-                        <button class="btn ar">Sync AR</button>
-                    </form>
-                </div>
-                <div class="card" style="background:#1c1c1e;">
-                    <h4 style="margin-top:0;">Kurdish</h4>
-                    <form action="/admin/sync/KU" method="post" enctype="multipart/form-data">
-                        <input type="file" name="csv_file" required>
-                        <button class="btn ku">Sync KU</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-
-        <div class="card">
-            <h3>3. Menu Overview</h3>
-            <table>
-                <thead><tr><th>Name (EN)</th><th>Category</th><th>Price</th><th>Action</th></tr></thead>
-                <tbody>
-                    {% for item in items %}
-                    <tr>
-                        <td><b>{{ item.Item_EN }}</b></td>
-                        <td>{{ item.Category_EN }}</td>
-                        <td>{{ item.Price }}</td>
-                        <td><a href="/admin/delete/{{ loop.index0 }}" style="color:#ef4444; font-size:12px;">Delete</a></td>
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-        </div>
+  <div class="card">
+    <h3>2. Sync CSV Files</h3>
+    <p style="color:#666">Format: Category, Name, Description, Price</p>
+    <div class="grid">
+      <form action="/admin/sync/EN" method="post" enctype="multipart/form-data" class="card" style="background:#111">
+        <h4>English</h4>
+        <input type="file" name="csv_file" required><br><br>
+        <button class="btn" style="background:#3b82f6; color:white;">Sync English</button>
+      </form>
+      <form action="/admin/sync/AR" method="post" enctype="multipart/form-data" class="card" style="background:#111">
+        <h4>Arabic</h4>
+        <input type="file" name="csv_file" required><br><br>
+        <button class="btn" style="background:#10b981; color:white;">Sync Arabic</button>
+      </form>
+      <form action="/admin/sync/KU" method="post" enctype="multipart/form-data" class="card" style="background:#111">
+        <h4>Kurdish</h4>
+        <input type="file" name="csv_file" required><br><br>
+        <button class="btn" style="background:#f59e0b; color:white;">Sync Kurdish</button>
+      </form>
     </div>
+  </div>
+
+  <div class="card">
+    <h3>3. Current Items</h3>
+    <table>
+      <thead><tr><th>Name (EN)</th><th>Price</th><th>Action</th></tr></thead>
+      <tbody>
+        {% for item in items %}
+        <tr>
+          <td>{{ item.Item_EN }}</td>
+          <td>{{ item.Price }}</td>
+          <td>
+            <a href="/admin/delete/{{ loop.index0 }}" style="color:red;">Delete</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </body>
 </html>
 '''
@@ -209,21 +230,39 @@ ADMIN_HTML = r'''
 @app.route("/")
 def index():
     lang = request.args.get("l", "en")
-    if lang not in LANG_MAP: lang = "en"
     items = load_menu()
     cat_key = f"Category_{lang.upper()}"
     categories = []
     for i in items:
         c = i.get(cat_key)
         if c and c not in categories: categories.append(c)
+    
     for i in items: i['image'] = get_image_url(i.get("Item_EN", ""))
-    return render_template_string(PUBLIC_HTML, items=items, categories=categories, lang=lang, lang_data=LANG_MAP[lang], logo_url=get_logo_url())
+    
+    return render_template_string(PUBLIC_HTML, items=items, categories=categories, 
+                                  lang=lang, logo_url=get_logo_url())
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST" and request.form.get("password") == ADMIN_PASSWORD:
+        session["is_admin"] = True
+        return redirect(url_for("admin_dashboard"))
+    return '<body style="background:#0a0a0b; color:white; display:flex; justify-content:center; align-items:center; height:100vh;"><form method="post"><input type="password" name="password" placeholder="Key" style="padding:10px;"><button style="padding:10px;">Enter</button></form></body>'
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("is_admin", None); return redirect(url_for("index"))
+
+@app.route("/admin")
+def admin_dashboard():
+    if not session.get("is_admin"): return redirect(url_for("admin_login"))
+    return render_template_string(ADMIN_HTML, items=load_menu())
 
 @app.route("/admin/sync/<lang>", methods=["POST"])
 def admin_sync(lang):
     if not session.get("is_admin"): return redirect(url_for("admin_login"))
     file = request.files.get("csv_file")
-    if file: process_uniform_csv(file, lang.upper())
+    if file: sync_language_csv(file, lang.upper())
     return redirect(url_for("admin_dashboard"))
 
 @app.route("/admin/upload_logo", methods=["POST"])
@@ -238,23 +277,6 @@ def upload_logo():
         file.save(os.path.join(UPLOAD_DIR, f"{LOGO_FILENAME}.{ext}"))
     return redirect(url_for("admin_dashboard"))
 
-@app.route("/admin/login", methods=["GET", "POST"])
-def admin_login():
-    if request.method == "POST" and request.form.get("password") == ADMIN_PASSWORD:
-        session["is_admin"] = True
-        return redirect(url_for("admin_dashboard"))
-    return '<body style="background:#0a0a0b; color:white; display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; font-family:sans-serif;"><h2>Admin Access</h2><form method="post"><input type="password" name="password" style="padding:15px; border-radius:8px; border:1px solid #333; background:#111; color:white;"><br><br><button style="width:100%; padding:10px; background:#c5a059; border:none; border-radius:8px; font-weight:bold; cursor:pointer;">Enter</button></form></body>'
-
-@app.route("/admin/logout")
-def admin_logout():
-    session.pop("is_admin", None)
-    return redirect(url_for("index"))
-
-@app.route("/admin")
-def admin_dashboard():
-    if not session.get("is_admin"): return redirect(url_for("admin_login"))
-    return render_template_string(ADMIN_HTML, items=load_menu())
-
 @app.route("/admin/delete/<int:idx>")
 def admin_delete(idx):
     if not session.get("is_admin"): return redirect(url_for("admin_login"))
@@ -266,5 +288,4 @@ def admin_delete(idx):
 def serve_upload(filename): return send_from_directory(UPLOAD_DIR, filename)
 
 if __name__ == "__main__":
-    if not os.path.exists(DATA_FILE): save_menu([])
     app.run(debug=True, port=5000)
