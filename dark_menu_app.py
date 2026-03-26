@@ -1,4 +1,3 @@
-
 import os
 import csv
 import io
@@ -10,6 +9,7 @@ import html
 import urllib.request
 import urllib.parse
 from collections import OrderedDict
+
 from flask import (
     Flask,
     request,
@@ -26,58 +26,46 @@ try:
 except Exception:
     OpenAI = None
 
-
+# ========== Environment ==========
 app = Flask(__name__)
-
-# Railway / deployment config
 port = int(os.environ.get("PORT", 8000))
 host = "0.0.0.0"
-app.secret_key = os.environ.get("FLASK_SECRET_KEY", "fallback-menu-key")
+secret_key = os.environ.get("FLASK_SECRET_KEY", "fallback-menu-key")
+app.secret_key = secret_key
 
-DATA_FILE = os.environ.get("MENU_DATA_FILE", "menu_data.csv")
-IMAGE_DIR = os.environ.get("MENU_IMAGE_DIR", "generated_images")
-UPLOAD_DIR = os.environ.get("MENU_UPLOAD_DIR", "uploaded_assets")
-SETTINGS_FILE = os.environ.get("MENU_SETTINGS_FILE", "menu_settings.json")
+DATA_FILE = "menu_data.csv"
+IMAGE_DIR = "generated_images"
+UPLOAD_DIR = "uploaded_assets"
+SETTINGS_FILE = "menu_settings.json"
 EXPECTED_COLUMNS = ["Category", "Item Name", "Description", "Price"]
-OPENAI_IMAGE_MODEL = os.environ.get("OPENAI_IMAGE_MODEL", "gpt-image-1")
+OPENAI_IMAGE_MODEL = os.environ.get("OPENAI_IMAGE_MODEL", "dall-e-3")
 ADMIN_PASSWORD = os.environ.get("MENU_ADMIN_PASSWORD", "1234")
 
 os.makedirs(IMAGE_DIR, exist_ok=True)
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-
-# ---------- Helpers ----------
-
+# ========== Helpers ==========
 def get_openai_client():
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
     if not api_key or OpenAI is None:
         return None
     return OpenAI(api_key=api_key)
 
-
 def load_settings():
     defaults = {
-        "site_title_ar": "قائمة المطعم",
-        "site_title_en": "Restaurant Menu",
-        "site_subtitle_ar": "قائمة رقمية حديثة",
-        "site_subtitle_en": "Modern digital menu",
+        "site_title": "قائمة المطعم",
+        "site_subtitle": "قائمة رقمية حديثة",
         "logo_path": "",
-        "currency_ar": "د.ع",
-        "currency_en": "IQD",
-        "hero_note_ar": "اختر القسم وشاهد الأصناف مباشرة",
-        "hero_note_en": "Pick a section and items appear instantly",
     }
     if not os.path.exists(SETTINGS_FILE):
         return defaults
     try:
         with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        if isinstance(data, dict):
-            defaults.update({k: data.get(k, defaults[k]) for k in defaults})
+        defaults.update({k: data.get(k, defaults[k]) for k in defaults})
+        return defaults
     except Exception:
-        pass
-    return defaults
-
+        return defaults
 
 def save_settings(new_data):
     current = load_settings()
@@ -85,14 +73,8 @@ def save_settings(new_data):
     with open(SETTINGS_FILE, "w", encoding="utf-8") as f:
         json.dump(current, f, ensure_ascii=False, indent=2)
 
-
 def normalize_headers(row):
-    clean = {}
-    for k, v in row.items():
-        key = (k or "").strip()
-        clean[key] = v.strip() if isinstance(v, str) else v
-    return clean
-
+    return {k.strip(): v.strip() if isinstance(v, str) else v for k, v in row.items()}
 
 def clean_item(item):
     return {
@@ -101,7 +83,6 @@ def clean_item(item):
         "Description": str(item.get("Description", "") or "").strip(),
         "Price": str(item.get("Price", "") or "").strip(),
     }
-
 
 def load_menu():
     if not os.path.exists(DATA_FILE):
@@ -112,10 +93,10 @@ def load_menu():
         for row in reader:
             row = normalize_headers(row)
             item = clean_item(row)
-            if item["Item Name"]:
-                items.append(item)
+            if not item["Item Name"]:
+                continue
+            items.append(item)
     return items
-
 
 def save_menu(items):
     with open(DATA_FILE, "w", encoding="utf-8-sig", newline="") as f:
@@ -124,7 +105,6 @@ def save_menu(items):
         for item in items:
             writer.writerow(clean_item(item))
 
-
 def parse_csv_text(text):
     f = io.StringIO(text)
     reader = csv.DictReader(f)
@@ -132,14 +112,15 @@ def parse_csv_text(text):
     missing = [col for col in EXPECTED_COLUMNS if col not in headers]
     if missing:
         raise ValueError(f"Missing columns: {', '.join(missing)}")
+
     items = []
     for row in reader:
         row = normalize_headers(row)
         item = clean_item(row)
-        if item["Item Name"]:
-            items.append(item)
+        if not item["Item Name"]:
+            continue
+        items.append(item)
     return items
-
 
 def sheets_to_csv_url(url):
     parsed = urllib.parse.urlparse(url)
@@ -163,7 +144,6 @@ def sheets_to_csv_url(url):
 
     return f"https://docs.google.com/spreadsheets/d/{sheet_id}/export?format=csv&gid={gid}"
 
-
 def download_text(url):
     req = urllib.request.Request(
         url,
@@ -172,17 +152,14 @@ def download_text(url):
     with urllib.request.urlopen(req, timeout=30) as resp:
         return resp.read().decode("utf-8-sig", errors="replace")
 
-
 def secure_filename_local(filename):
     filename = os.path.basename(filename)
     filename = re.sub(r"[^A-Za-z0-9._-]+", "_", filename)
     return filename or "file"
 
-
 def image_filename_for_item(item_name):
     digest = hashlib.sha1(item_name.encode("utf-8")).hexdigest()[:16]
     return f"{digest}.png"
-
 
 def upload_filename_for_item(item_name, original_name):
     ext = os.path.splitext(original_name)[1].lower()
@@ -191,8 +168,7 @@ def upload_filename_for_item(item_name, original_name):
     digest = hashlib.sha1(item_name.encode("utf-8")).hexdigest()[:16]
     return f"{digest}{ext}"
 
-
-def placeholder_svg_data_uri(title, subtitle="Menu Item"):
+def placeholder_svg_data_uri(title, subtitle="صنف من القائمة"):
     title = html.escape(title)
     subtitle = html.escape(subtitle)
     svg = f"""
@@ -215,17 +191,12 @@ def placeholder_svg_data_uri(title, subtitle="Menu Item"):
     encoded = urllib.parse.quote(svg)
     return f"data:image/svg+xml;charset=utf-8,{encoded}"
 
-
 def user_uploaded_image_url(item_name):
     digest = hashlib.sha1(item_name.encode("utf-8")).hexdigest()[:16]
-    try:
-        for name in os.listdir(UPLOAD_DIR):
-            if name.startswith(digest + "."):
-                return f"/uploads/{name}"
-    except FileNotFoundError:
-        return None
+    for name in os.listdir(UPLOAD_DIR):
+        if name.startswith(digest + "."):
+            return f"/uploads/{name}"
     return None
-
 
 def ai_generated_image_url(item_name):
     filename = image_filename_for_item(item_name)
@@ -234,7 +205,6 @@ def ai_generated_image_url(item_name):
         return f"/images/{filename}"
     return None
 
-
 def best_image_url(item_name, category):
     uploaded = user_uploaded_image_url(item_name)
     if uploaded:
@@ -242,32 +212,32 @@ def best_image_url(item_name, category):
     generated = ai_generated_image_url(item_name)
     if generated:
         return generated
-    return placeholder_svg_data_uri(item_name, category or "Menu Item")
-
+    return placeholder_svg_data_uri(item_name, category or "صنف فارغ")
 
 def generate_image_prompt(item_name, category):
     return (
         f"Restaurant menu photo of '{item_name}' from category '{category}'. "
-        "Elegant food photography, realistic plated presentation, centered composition, "
+        "Dark elegant food photography, realistic plated presentation, centered composition, "
         "premium restaurant style, studio lighting, clean background, no text, no watermark."
     )
-
 
 def generate_item_image(item_name, category):
     client = get_openai_client()
     if client is None:
-        return None, "OpenAI API key is missing."
+        return None
     filename = image_filename_for_item(item_name)
     path = os.path.join(IMAGE_DIR, filename)
     if os.path.exists(path):
-        return f"/images/{filename}", None
+        return f"/images/{filename}"
 
     try:
         result = client.images.generate(
             model=OPENAI_IMAGE_MODEL,
             prompt=generate_image_prompt(item_name, category),
             size="1024x1024",
+            response_format="b64_json",
         )
+
         first = result.data[0]
         image_b64 = getattr(first, "b64_json", None)
         image_url = getattr(first, "url", None)
@@ -275,106 +245,303 @@ def generate_item_image(item_name, category):
         if image_b64:
             with open(path, "wb") as f:
                 f.write(base64.b64decode(image_b64))
-            return f"/images/{filename}", None
+            return f"/images/{filename}"
         if image_url:
             req = urllib.request.Request(image_url, headers={"User-Agent": "Mozilla/5.0"})
             with urllib.request.urlopen(req, timeout=60) as resp:
                 data = resp.read()
             with open(path, "wb") as f:
                 f.write(data)
-            return f"/images/{filename}", None
-        return None, "Image API returned no image."
+            return f"/images/{filename}"
     except Exception as e:
         print(f"[Image gen error] {e}")
-        return None, str(e)
-
+    return None
 
 def is_admin():
     return session.get("is_admin") is True
-
 
 def require_admin():
     if not is_admin():
         return redirect(url_for("admin_login"))
     return None
 
-
 def build_item_view(item):
     return {
         **item,
-        "ImageURL": best_image_url(item["Item Name"], item["Category"] or "Menu Item"),
+        "ImageURL": best_image_url(
+            item["Item Name"], item["Category"] or "بدون قسم"
+        ),
     }
 
-
-def grouped_items(items):
-    groups = OrderedDict()
+# ========== Routes ==========
+@app.route("/")
+def index():
+    settings = load_settings()
+    items = load_menu()
+    # Group by category
+    categories = {}
     for item in items:
-        cat = item["Category"] or "Other"
-        groups.setdefault(cat, [])
-        groups[cat].append(build_item_view(item))
-    return groups
+        cat = item["Category"] or "أخرى"
+        categories.setdefault(cat, []).append(build_item_view(item))
 
+    # Sort categories and items alphabetically
+    sorted_categories = sorted(categories.items(), key=lambda x: x[0])
+    for cat, cat_items in sorted_categories:
+        cat_items.sort(key=lambda x: x["Item Name"])
 
-def menu_stats(items):
-    categories = sorted({(i["Category"] or "Other") for i in items})
-    return {
-        "item_count": len(items),
-        "category_count": len(categories),
-        "categories": categories,
+    return render_template_string(
+        MAIN_TEMPLATE,
+        title=settings["site_title"],
+        subtitle=settings["site_subtitle"],
+        logo_path=settings["logo_path"],
+        categories=sorted_categories,
+        is_admin=is_admin(),
+    )
+
+@app.route("/admin/login", methods=["GET", "POST"])
+def admin_login():
+    if request.method == "POST":
+        password = request.form.get("password", "")
+        if password == ADMIN_PASSWORD:
+            session["is_admin"] = True
+            flash("تم تسجيل الدخول بنجاح", "success")
+            return redirect(url_for("admin_dashboard"))
+        else:
+            flash("كلمة المرور غير صحيحة", "error")
+    return render_template_string(LOGIN_TEMPLATE)
+
+@app.route("/admin/logout")
+def admin_logout():
+    session.pop("is_admin", None)
+    flash("تم تسجيل الخروج", "info")
+    return redirect(url_for("index"))
+
+@app.route("/admin")
+def admin_dashboard():
+    resp = require_admin()
+    if resp:
+        return resp
+    items = load_menu()
+    settings = load_settings()
+    return render_template_string(
+        DASHBOARD_TEMPLATE,
+        items=items,
+        settings=settings,
+    )
+
+@app.route("/admin/import_csv", methods=["POST"])
+def admin_import_csv():
+    resp = require_admin()
+    if resp:
+        return resp
+
+    source = request.form.get("source", "file")
+    try:
+        if source == "file":
+            file = request.files.get("csv_file")
+            if not file or not file.filename:
+                flash("الرجاء اختيار ملف CSV", "error")
+                return redirect(url_for("admin_dashboard"))
+            text = file.read().decode("utf-8-sig", errors="replace")
+        elif source == "url":
+            url = request.form.get("url", "").strip()
+            if not url:
+                flash("الرجاء إدخال رابط", "error")
+                return redirect(url_for("admin_dashboard"))
+            if "docs.google.com" in url:
+                url = sheets_to_csv_url(url)
+            text = download_text(url)
+        elif source == "text":
+            text = request.form.get("csv_text", "")
+            if not text:
+                flash("الرجاء إدخال نص CSV", "error")
+                return redirect(url_for("admin_dashboard"))
+        else:
+            flash("مصدر غير صالح", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        new_items = parse_csv_text(text)
+        if not new_items:
+            flash("لم يتم العثور على أصناف صالحة في الملف", "error")
+            return redirect(url_for("admin_dashboard"))
+
+        # Replace entire menu
+        save_menu(new_items)
+        flash(f"تم استيراد {len(new_items)} صنفاً بنجاح", "success")
+    except Exception as e:
+        flash(f"خطأ أثناء الاستيراد: {str(e)}", "error")
+
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/add_item", methods=["POST"])
+def admin_add_item():
+    resp = require_admin()
+    if resp:
+        return resp
+
+    item = clean_item({
+        "Category": request.form.get("category", ""),
+        "Item Name": request.form.get("name", ""),
+        "Description": request.form.get("description", ""),
+        "Price": request.form.get("price", ""),
+    })
+    if not item["Item Name"]:
+        flash("اسم الصنف مطلوب", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    items = load_menu()
+    items.append(item)
+    save_menu(items)
+    flash(f"تمت إضافة '{item['Item Name']}'", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/edit_item/<path:item_name>", methods=["POST"])
+def admin_edit_item(item_name):
+    resp = require_admin()
+    if resp:
+        return resp
+
+    items = load_menu()
+    found = None
+    for it in items:
+        if it["Item Name"] == item_name:
+            found = it
+            break
+    if not found:
+        flash("الصنف غير موجود", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    found["Category"] = request.form.get("category", "").strip()
+    found["Item Name"] = request.form.get("name", "").strip()
+    found["Description"] = request.form.get("description", "").strip()
+    found["Price"] = request.form.get("price", "").strip()
+    if not found["Item Name"]:
+        flash("اسم الصنف لا يمكن أن يكون فارغاً", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    save_menu(items)
+    flash(f"تم تعديل '{item_name}' بنجاح", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/delete_item/<path:item_name>")
+def admin_delete_item(item_name):
+    resp = require_admin()
+    if resp:
+        return resp
+
+    items = load_menu()
+    new_items = [it for it in items if it["Item Name"] != item_name]
+    if len(new_items) == len(items):
+        flash("الصنف غير موجود", "error")
+    else:
+        save_menu(new_items)
+        flash(f"تم حذف '{item_name}'", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/generate_all_images")
+def admin_generate_all_images():
+    resp = require_admin()
+    if resp:
+        return resp
+
+    items = load_menu()
+    client = get_openai_client()
+    if client is None:
+        flash("OpenAI API key غير مضبوط أو مكتبة OpenAI غير مثبتة", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    generated = 0
+    for item in items:
+        if not ai_generated_image_url(item["Item Name"]):
+            url = generate_item_image(item["Item Name"], item["Category"] or "طعام")
+            if url:
+                generated += 1
+    flash(f"تم إنشاء {generated} صورة جديدة", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/upload_image/<path:item_name>", methods=["POST"])
+def admin_upload_image(item_name):
+    resp = require_admin()
+    if resp:
+        return resp
+
+    file = request.files.get("image")
+    if not file or not file.filename:
+        flash("الرجاء اختيار صورة", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".gif", ".webp"):
+        flash("امتداد الصورة غير مدعوم (png, jpg, jpeg, gif, webp)", "error")
+        return redirect(url_for("admin_dashboard"))
+
+    filename = upload_filename_for_item(item_name, file.filename)
+    path = os.path.join(UPLOAD_DIR, filename)
+    file.save(path)
+    flash(f"تم رفع الصورة للصنف '{item_name}'", "success")
+    return redirect(url_for("admin_dashboard"))
+
+@app.route("/admin/settings", methods=["POST"])
+def admin_settings():
+    resp = require_admin()
+    if resp:
+        return resp
+
+    new_settings = {
+        "site_title": request.form.get("site_title", "").strip(),
+        "site_subtitle": request.form.get("site_subtitle", "").strip(),
     }
+    if not new_settings["site_title"]:
+        new_settings["site_title"] = "قائمة المطعم"
 
+    # Handle logo upload
+    logo_file = request.files.get("logo")
+    if logo_file and logo_file.filename:
+        logo_name = "logo" + os.path.splitext(logo_file.filename)[1].lower()
+        logo_path = os.path.join(UPLOAD_DIR, logo_name)
+        logo_file.save(logo_path)
+        new_settings["logo_path"] = f"/uploads/{logo_name}"
+    else:
+        # Keep existing logo path
+        current = load_settings()
+        new_settings["logo_path"] = current.get("logo_path", "")
 
-def get_lang():
-    lang = request.args.get("lang", "").strip().lower()
-    if lang not in {"ar", "en"}:
-        lang = session.get("lang", "ar")
-    session["lang"] = lang
-    return lang
+    save_settings(new_settings)
+    flash("تم حفظ الإعدادات", "success")
+    return redirect(url_for("admin_dashboard"))
 
+@app.route("/admin/export_csv")
+def admin_export_csv():
+    resp = require_admin()
+    if resp:
+        return resp
 
-def tr(lang, ar, en):
-    return ar if lang == "ar" else en
+    items = load_menu()
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=EXPECTED_COLUMNS)
+    writer.writeheader()
+    for item in items:
+        writer.writerow(clean_item(item))
+    response = app.response_class(
+        response=output.getvalue(),
+        status=200,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment;filename=menu.csv"},
+    )
+    return response
 
+@app.route("/images/<path:filename>")
+def serve_image(filename):
+    return send_from_directory(IMAGE_DIR, filename)
 
-def page_direction(lang):
-    return "rtl" if lang == "ar" else "ltr"
+@app.route("/uploads/<path:filename>")
+def serve_upload(filename):
+    return send_from_directory(UPLOAD_DIR, filename)
 
-
-def text_align(lang):
-    return "right" if lang == "ar" else "left"
-
-
-def format_price(price, lang, settings):
-    price = (price or "").strip()
-    if not price:
-        return ""
-    currency = settings["currency_ar"] if lang == "ar" else settings["currency_en"]
-    return f"{price} {currency}"
-
-
-def save_uploaded_logo(file_storage):
-    if not file_storage or not file_storage.filename:
-        return ""
-    filename = "logo_" + secure_filename_local(file_storage.filename)
-    path = os.path.join(UPLOAD_DIR, filename)
-    file_storage.save(path)
-    return f"/uploads/{filename}"
-
-
-def save_item_image(item_name, file_storage):
-    if not file_storage or not file_storage.filename:
-        return None
-    filename = upload_filename_for_item(item_name, file_storage.filename)
-    path = os.path.join(UPLOAD_DIR, filename)
-    file_storage.save(path)
-    return f"/uploads/{filename}"
-
-
-# ---------- Templates ----------
-
-BASE_HTML = r"""
+# ========== Simplified Customer Template ==========
+MAIN_TEMPLATE = """
 <!doctype html>
-<html lang="{{ lang }}" dir="{{ direction }}">
+<html lang="ar" dir="rtl">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -389,155 +556,136 @@ BASE_HTML = r"""
       --muted: #a1a1aa;
       --accent: #eab308;
       --accent-2: #f59e0b;
-      --danger: #ef4444;
-      --ok: #22c55e;
-      --shadow: 0 10px 30px rgba(0,0,0,.24);
       --radius: 20px;
     }
     * { box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
     body {
       margin: 0;
-      font-family: Tahoma, Arial, sans-serif;
+      font-family: system-ui, 'Segoe UI', Tahoma, Arial, sans-serif;
       background:
         radial-gradient(circle at top right, rgba(234,179,8,.09), transparent 22%),
         radial-gradient(circle at left bottom, rgba(245,158,11,.06), transparent 20%),
         var(--bg);
       color: var(--text);
-      direction: {{ direction }};
-      text-align: {{ align }};
+      direction: rtl;
     }
     a { color: inherit; text-decoration: none; }
     .topbar {
       position: sticky; top: 0; z-index: 30;
       display: flex; align-items: center; justify-content: space-between; gap: 12px;
       padding: 14px 20px; backdrop-filter: blur(14px);
-      background: rgba(9,9,11,.78); border-bottom: 1px solid rgba(255,255,255,.06);
+      background: rgba(9,9,11,.72); border-bottom: 1px solid rgba(255,255,255,.06);
     }
-    .brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+    .brand { display: flex; align-items: center; gap: 12px; }
     .brand-badge {
       width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: black; font-weight: 900; overflow: hidden; flex: 0 0 44px;
+      color: black; font-weight: 900; overflow: hidden;
     }
     .brand-badge img { width: 100%; height: 100%; object-fit: cover; border-radius: 14px; }
-    .brand-text { min-width: 0; }
-    .brand-title { margin: 0; font-size: 18px; font-weight: 800; }
-    .brand-subtitle { margin: 3px 0 0; color: var(--muted); font-size: 12px; }
-    .nav { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
-    .nav a, .nav button {
-      padding: 10px 14px; border-radius: 999px; background: #17171a;
-      border: 1px solid var(--line); color: #e4e4e7; font-size: 14px; cursor: pointer;
-    }
     .container { max-width: 1320px; margin: 0 auto; padding: 24px 16px 40px; }
-    .hero { display: grid; grid-template-columns: 1.2fr .8fr; gap: 18px; margin-bottom: 22px; }
-    .card {
-      background: linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01));
-      border: 1px solid rgba(255,255,255,.07); border-radius: var(--radius);
-      box-shadow: var(--shadow); padding: 22px;
+    .hero {
+      text-align: center;
+      margin-bottom: 32px;
     }
-    .headline { font-size: clamp(28px, 4vw, 48px); line-height: 1.05; margin: 0 0 10px; font-weight: 800; }
-    .sub { margin: 0; color: var(--muted); line-height: 1.8; font-size: 15px; }
-    .hero-note { margin-top: 16px; color: #fde68a; font-size: 14px; }
-    .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 18px; }
-    .stat { padding: 14px; border-radius: 16px; background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.06); }
-    .stat .num { font-size: 24px; font-weight: 800; margin-bottom: 6px; }
-    .stat .lbl { color: var(--muted); font-size: 13px; }
-    .search-card { display: flex; flex-direction: column; justify-content: center; }
-    .field-label { color: var(--muted); font-size: 13px; margin-bottom: 7px; }
-    .row { display: grid; grid-template-columns: 1.2fr .8fr auto; gap: 12px; align-items: end; }
-    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
-    .input, .select, .btn, .file, textarea {
-      width: 100%; border-radius: 16px; border: 1px solid var(--line);
-      background: #101014; color: var(--text); padding: 13px 14px; font-size: 15px; outline: none;
+    .headline {
+      font-size: clamp(32px, 5vw, 56px);
+      line-height: 1.1;
+      margin: 0 0 8px;
+      font-weight: 800;
     }
-    textarea { min-height: 120px; resize: vertical; }
-    .btn {
-      cursor: pointer; background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #111; font-weight: 800; border: none; min-width: 140px;
+    .sub {
+      margin: 0;
+      color: var(--muted);
+      font-size: 16px;
     }
-    .btn.secondary { background: #17171a; color: var(--text); border: 1px solid var(--line); }
-    .btn.danger { background: linear-gradient(135deg, #ef4444, #dc2626); color: #fff; }
-    .flash {
-      padding: 12px 14px; border-radius: 14px; margin-bottom: 16px;
-      border: 1px solid rgba(255,255,255,.08);
-      background: rgba(255,255,255,.04);
-    }
-    .flash.error { color: #fecaca; background: rgba(239,68,68,.12); border-color: rgba(239,68,68,.26);}
-    .flash.success { color: #bbf7d0; background: rgba(34,197,94,.12); border-color: rgba(34,197,94,.26);}
-    .flash.info { color: #fde68a; background: rgba(234,179,8,.12); border-color: rgba(234,179,8,.26);}
     .category-chips {
-      display: flex; gap: 10px; overflow: auto; padding-bottom: 4px; margin: 16px 0 18px;
-      scroll-snap-type: x proximity;
+      display: flex;
+      gap: 10px;
+      overflow-x: auto;
+      padding-bottom: 8px;
+      margin: 16px 0 24px;
     }
     .chip {
-      white-space: nowrap; padding: 11px 15px; border-radius: 999px; background: #141418;
-      border: 1px solid var(--line); color: #d4d4d8; display: inline-flex; align-items: center; gap: 8px;
-      scroll-snap-align: start;
+      white-space: nowrap;
+      padding: 10px 18px;
+      border-radius: 999px;
+      background: #141418;
+      border: 1px solid var(--line);
+      color: #d4d4d8;
+      cursor: pointer;
+      transition: all 0.2s;
     }
     .chip.active {
       background: linear-gradient(135deg, var(--accent), var(--accent-2));
-      color: #111; border-color: transparent; font-weight: 800;
+      color: #111;
+      border-color: transparent;
+      font-weight: 800;
     }
     .section-title {
-      margin: 30px 0 16px; font-size: clamp(22px, 3vw, 30px); font-weight: 800;
-      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      margin: 32px 0 16px;
+      font-size: 28px;
+      font-weight: 700;
+      border-right: 4px solid var(--accent);
+      padding-right: 14px;
     }
-    .section-count {
-      font-size: 13px; color: var(--muted); background: rgba(255,255,255,.04);
-      padding: 8px 12px; border-radius: 999px; border: 1px solid rgba(255,255,255,.06);
+    .menu-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 24px;
     }
-    .grid {
-      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px;
+    .item-card {
+      background: var(--panel);
+      border-radius: 28px;
+      border: 1px solid rgba(255,255,255,.05);
+      overflow: hidden;
+      transition: transform 0.2s, box-shadow 0.2s;
     }
-    .item {
-      overflow: hidden; padding: 0;
-      display: flex; flex-direction: column;
+    .item-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 20px 35px -10px black;
     }
-    .item-image {
-      width: 100%; aspect-ratio: 4 / 3; object-fit: cover; display: block; background: #18181b;
+    .item-img {
+      width: 100%;
+      height: 210px;
+      object-fit: cover;
+      background: #1f1f22;
     }
-    .item-body { padding: 18px; display: flex; flex-direction: column; gap: 12px; }
-    .item-top {
-      display: flex; align-items: start; justify-content: space-between; gap: 12px;
+    .item-info {
+      padding: 18px;
     }
-    .item-name { margin: 0; font-size: 20px; font-weight: 800; }
+    .item-name {
+      font-size: 1.4rem;
+      font-weight: 800;
+      margin: 0 0 6px;
+    }
+    .item-desc {
+      font-size: 0.9rem;
+      color: var(--muted);
+      margin-bottom: 12px;
+      line-height: 1.5;
+    }
     .item-price {
-      padding: 9px 12px; border-radius: 999px;
-      background: rgba(234,179,8,.13); color: #fde68a; font-weight: 800; white-space: nowrap;
-      border: 1px solid rgba(234,179,8,.22);
+      font-weight: 800;
+      font-size: 1.3rem;
+      color: var(--accent);
     }
-    .item-desc { margin: 0; color: var(--muted); line-height: 1.8; font-size: 14px; min-height: 48px; }
-    .admin-table-wrap { overflow: auto; }
-    table {
-      width: 100%; border-collapse: collapse; min-width: 720px;
-      background: rgba(255,255,255,.02); border: 1px solid rgba(255,255,255,.06); border-radius: 16px; overflow: hidden;
+    .empty-msg {
+      text-align: center;
+      color: var(--muted);
+      padding: 50px;
     }
-    th, td { padding: 12px 14px; border-bottom: 1px solid rgba(255,255,255,.06); vertical-align: top; }
-    th { color: #fde68a; background: rgba(255,255,255,.03); }
-    td.actions form { display: inline-block; margin: 0 0 8px 8px; }
-    .toolbar {
-      display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 16px;
-    }
-    .muted { color: var(--muted); }
-    .center-empty {
-      text-align: center; padding: 40px 20px; color: var(--muted);
-      border: 1px dashed rgba(255,255,255,.12); border-radius: 20px; margin-top: 14px;
-    }
-    .split { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
-    .footer-space { height: 20px; }
-    .login-box { max-width: 480px; margin: 70px auto; }
-    .small { font-size: 12px; color: var(--muted); }
-    @media (max-width: 980px) {
-      .hero, .split, .row, .row2, .grid { grid-template-columns: 1fr; }
-      .stats { grid-template-columns: 1fr 1fr 1fr; }
+    footer {
+      text-align: center;
+      margin-top: 48px;
+      padding: 24px;
+      color: var(--muted);
+      border-top: 1px solid var(--line);
     }
     @media (max-width: 680px) {
-      .topbar { padding: 12px; }
-      .nav { gap: 8px; }
-      .nav a, .nav button { padding: 9px 12px; font-size: 13px; }
-      .stats { grid-template-columns: 1fr; }
-      .container { padding: 18px 12px 30px; }
+      .menu-grid {
+        grid-template-columns: 1fr;
+      }
     }
   </style>
 </head>
@@ -545,667 +693,275 @@ BASE_HTML = r"""
   <div class="topbar">
     <div class="brand">
       <div class="brand-badge">
-        {% if settings.logo_path %}
-          <img src="{{ settings.logo_path }}" alt="logo">
+        {% if logo_path %}
+        <img src="{{ logo_path }}" alt="logo">
         {% else %}
-          <span>🍽</span>
+        🍽️
         {% endif %}
       </div>
-      <div class="brand-text">
-        <h1 class="brand-title">{{ settings.site_title_ar if lang == 'ar' else settings.site_title_en }}</h1>
-        <p class="brand-subtitle">{{ settings.site_subtitle_ar if lang == 'ar' else settings.site_subtitle_en }}</p>
-      </div>
+      <span class="headline" style="font-size:1.5rem; margin:0;">{{ title }}</span>
     </div>
     <div class="nav">
-      <a href="{{ lang_switch_url }}">{{ "English" if lang == "ar" else "العربية" }}</a>
       {% if is_admin %}
-        <a href="{{ url_for('admin_dashboard', lang=lang) }}">{{ "لوحة التحكم" if lang == "ar" else "Dashboard" }}</a>
-        <a href="{{ url_for('admin_logout', lang=lang) }}">{{ "خروج" if lang == "ar" else "Logout" }}</a>
+      <a href="{{ url_for('admin_dashboard') }}" style="background:#17171a; padding:8px 16px; border-radius:999px;">لوحة التحكم</a>
+      <a href="{{ url_for('admin_logout') }}" style="background:#17171a; padding:8px 16px; border-radius:999px;">خروج</a>
       {% endif %}
     </div>
   </div>
 
   <div class="container">
-    {% with messages = get_flashed_messages(with_categories=true) %}
-      {% if messages %}
-        {% for category, message in messages %}
-          <div class="flash {{ category }}">{{ message }}</div>
-        {% endfor %}
-      {% endif %}
-    {% endwith %}
+    <div class="hero">
+      <h1 class="headline">{{ title }}</h1>
+      <p class="sub">{{ subtitle }}</p>
+    </div>
 
-    {{ content|safe }}
+    <div class="category-chips" id="categoryChips">
+      <div class="chip active" data-cat="all">الكل</div>
+      {% for cat, _ in categories %}
+      <div class="chip" data-cat="{{ cat }}">{{ cat }}</div>
+      {% endfor %}
+    </div>
+
+    {% for cat, items in categories %}
+    <div class="category-section" data-category="{{ cat }}">
+      <h2 class="section-title">{{ cat }}</h2>
+      <div class="menu-grid">
+        {% for item in items %}
+        <div class="item-card">
+          <img class="item-img" src="{{ item['ImageURL'] }}" alt="{{ item['Item Name'] }}" loading="lazy">
+          <div class="item-info">
+            <div class="item-name">{{ item['Item Name'] }}</div>
+            <div class="item-desc">{{ item['Description'] or 'لا يوجد وصف' }}</div>
+            <div class="item-price">{{ item['Price'] or '—' }}</div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% else %}
+    <div class="empty-msg">لا توجد أصناف مضافة بعد. قم بتسجيل الدخول لإضافة قائمة.</div>
+    {% endfor %}
   </div>
-  <div class="footer-space"></div>
+
+  <footer>
+    {{ title }} — قائمة رقمية
+  </footer>
+
+  <script>
+    // Category filter
+    const chips = document.querySelectorAll('.chip');
+    const sections = document.querySelectorAll('.category-section');
+    chips.forEach(chip => {
+      chip.addEventListener('click', () => {
+        chips.forEach(c => c.classList.remove('active'));
+        chip.classList.add('active');
+        const selected = chip.getAttribute('data-cat');
+        if (selected === 'all') {
+          sections.forEach(s => s.style.display = '');
+        } else {
+          sections.forEach(s => {
+            if (s.getAttribute('data-category') === selected) {
+              s.style.display = '';
+            } else {
+              s.style.display = 'none';
+            }
+          });
+        }
+      });
+    });
+  </script>
 </body>
 </html>
 """
 
+LOGIN_TEMPLATE = """
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>دخول المشرف</title>
+  <style>
+    body {
+      background: #09090b;
+      display: flex; align-items: center; justify-content: center;
+      min-height: 100vh; font-family: system-ui; margin: 0;
+    }
+    .login-card {
+      background: #111113; border: 1px solid #27272a; border-radius: 32px;
+      padding: 32px; width: 100%; max-width: 380px;
+    }
+    .input { width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #27272a; background: #18181b; color: white; margin-bottom: 16px; }
+    .btn { width: 100%; padding: 12px; border-radius: 999px; background: #eab308; color: black; font-weight: bold; border: none; cursor: pointer; }
+    .flash { background: rgba(234,179,8,.12); color: #fcd34d; border-radius: 14px; padding: 10px; margin-bottom: 16px; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="login-card">
+    <h2 style="margin-top:0">دخول المشرف</h2>
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
+    <form method="post">
+      <input type="password" name="password" class="input" placeholder="كلمة المرور" autofocus>
+      <button type="submit" class="btn">تسجيل الدخول</button>
+    </form>
+  </div>
+</body>
+</html>
+"""
 
-# ---------- Routes ----------
+DASHBOARD_TEMPLATE = """
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>لوحة التحكم</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      background: #09090b; color: #fafafa; font-family: system-ui; margin: 0; padding: 20px;
+    }
+    .container { max-width: 1200px; margin: 0 auto; }
+    .card {
+      background: #111113; border: 1px solid #27272a; border-radius: 24px;
+      padding: 24px; margin-bottom: 24px;
+    }
+    h2 { margin-top: 0; }
+    .form-group { margin-bottom: 16px; }
+    .input, .select, textarea, .file-input {
+      width: 100%; padding: 12px; border-radius: 16px; border: 1px solid #27272a;
+      background: #18181b; color: white;
+    }
+    .btn {
+      background: #eab308; color: black; padding: 10px 18px; border-radius: 999px;
+      border: none; font-weight: bold; cursor: pointer; display: inline-block; margin-top: 8px;
+    }
+    .btn-danger { background: #dc2626; color: white; }
+    .btn-secondary { background: #3f3f46; color: white; }
+    .table-responsive { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: right; padding: 12px 8px; border-bottom: 1px solid #27272a; }
+    th { color: #a1a1aa; }
+    .flash { background: rgba(234,179,8,.12); color: #fcd34d; padding: 12px; border-radius: 14px; margin-bottom: 16px; }
+    .nav { display: flex; gap: 16px; margin-bottom: 20px; }
+    .nav a { color: #eab308; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="nav">
+      <a href="/">العودة للقائمة</a>
+      <a href="{{ url_for('admin_logout') }}">تسجيل الخروج</a>
+      <a href="{{ url_for('admin_export_csv') }}">تصدير CSV</a>
+    </div>
 
-@app.route("/")
-def public_menu():
-    lang = get_lang()
-    settings = load_settings()
-    items = load_menu()
-    stats = menu_stats(items)
-    active = request.args.get("category", "").strip()
-    grouped = grouped_items(items)
-    if active and active not in grouped:
-        active = ""
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+        {% for category, message in messages %}
+          <div class="flash">{{ message }}</div>
+        {% endfor %}
+      {% endif %}
+    {% endwith %}
 
-    categories = list(grouped.keys())
-    shown_groups = grouped if not active else OrderedDict([(active, grouped.get(active, []))])
-
-    content = render_template_string(
-        r"""
-        <div class="hero">
-          <div class="card">
-            <h2 class="headline">{{ settings.site_title_ar if lang == 'ar' else settings.site_title_en }}</h2>
-            <p class="sub">{{ settings.site_subtitle_ar if lang == 'ar' else settings.site_subtitle_en }}</p>
-            <p class="hero-note">{{ settings.hero_note_ar if lang == 'ar' else settings.hero_note_en }}</p>
-            <div class="stats">
-              <div class="stat">
-                <div class="num">{{ stats.item_count }}</div>
-                <div class="lbl">{{ "عدد الأصناف" if lang == "ar" else "Items" }}</div>
-              </div>
-              <div class="stat">
-                <div class="num">{{ stats.category_count }}</div>
-                <div class="lbl">{{ "عدد الأقسام" if lang == "ar" else "Categories" }}</div>
-              </div>
-              <div class="stat">
-                <div class="num">{{ categories|length }}</div>
-                <div class="lbl">{{ "الأقسام الظاهرة" if lang == "ar" else "Visible sections" }}</div>
-              </div>
-            </div>
-          </div>
-
-          <div class="card search-card">
-            <form method="get" action="{{ url_for('public_menu') }}">
-              <input type="hidden" name="lang" value="{{ lang }}">
-              <label class="field-label">{{ "اختر القسم" if lang == "ar" else "Choose section" }}</label>
-              <div class="row">
-                <select name="category" class="select" onchange="this.form.submit()">
-                  <option value="">{{ "كل الأقسام" if lang == "ar" else "All categories" }}</option>
-                  {% for cat in categories %}
-                    <option value="{{ cat }}" {% if active == cat %}selected{% endif %}>{{ cat }}</option>
-                  {% endfor %}
-                </select>
-                <input class="input" type="search" id="menuSearch" placeholder="{{ 'ابحث عن صنف...' if lang == 'ar' else 'Search item...' }}">
-                <a class="btn secondary" href="{{ url_for('public_menu', lang=lang) }}">{{ "إعادة ضبط" if lang == "ar" else "Reset" }}</a>
-              </div>
-            </form>
-          </div>
+    <div class="card">
+      <h2>استيراد CSV</h2>
+      <form method="post" action="{{ url_for('admin_import_csv') }}" enctype="multipart/form-data">
+        <div class="form-group">
+          <select name="source" class="select" onchange="toggleSource(this.value)">
+            <option value="file">رفع ملف CSV</option>
+            <option value="url">رابط CSV أو Google Sheets</option>
+            <option value="text">لصق نص CSV</option>
+          </select>
         </div>
+        <div id="fileSource">
+          <input type="file" name="csv_file" accept=".csv" class="file-input">
+        </div>
+        <div id="urlSource" style="display:none">
+          <input type="text" name="url" class="input" placeholder="https://...">
+        </div>
+        <div id="textSource" style="display:none">
+          <textarea name="csv_text" rows="5" class="input" placeholder="العمود الأول: Category,Item Name,Description,Price..."></textarea>
+        </div>
+        <button type="submit" class="btn">استيراد واستبدال القائمة</button>
+      </form>
+    </div>
 
-        {% if categories %}
-          <div class="category-chips">
-            <a class="chip {% if not active %}active{% endif %}" href="{{ url_for('public_menu', lang=lang) }}">
-              {{ "الكل" if lang == "ar" else "All" }}
-            </a>
-            {% for cat in categories %}
-              <a class="chip {% if active == cat %}active{% endif %}" href="{{ url_for('public_menu', category=cat, lang=lang) }}">{{ cat }}</a>
+    <div class="card">
+      <h2>إضافة صنف جديد</h2>
+      <form method="post" action="{{ url_for('admin_add_item') }}">
+        <div class="form-group"><input type="text" name="name" class="input" placeholder="اسم الصنف *" required></div>
+        <div class="form-group"><input type="text" name="category" class="input" placeholder="القسم (مثل: مقبلات)"></div>
+        <div class="form-group"><textarea name="description" class="input" placeholder="وصف"></textarea></div>
+        <div class="form-group"><input type="text" name="price" class="input" placeholder="السعر"></div>
+        <button type="submit" class="btn">إضافة</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>إعدادات الموقع</h2>
+      <form method="post" action="{{ url_for('admin_settings') }}" enctype="multipart/form-data">
+        <div class="form-group"><input type="text" name="site_title" class="input" placeholder="عنوان الموقع" value="{{ settings.site_title }}"></div>
+        <div class="form-group"><input type="text" name="site_subtitle" class="input" placeholder="النص الفرعي" value="{{ settings.site_subtitle }}"></div>
+        <div class="form-group">
+          <label>شعار الموقع</label>
+          <input type="file" name="logo" accept="image/*" class="file-input">
+          {% if settings.logo_path %}<div class="flash" style="margin-top:8px">الشعار الحالي: {{ settings.logo_path }}</div>{% endif %}
+        </div>
+        <button type="submit" class="btn">حفظ الإعدادات</button>
+      </form>
+    </div>
+
+    <div class="card">
+      <h2>إدارة الأصناف</h2>
+      <div class="table-responsive">
+        <table>
+          <thead>
+            <tr><th>الصنف</th><th>القسم</th><th>السعر</th><th>صورة</th><th>إجراءات</th></tr>
+          </thead>
+          <tbody>
+            {% for item in items %}
+            <tr>
+              <form method="post" action="{{ url_for('admin_edit_item', item_name=item['Item Name']) }}">
+                <td><input type="text" name="name" value="{{ item['Item Name'] }}" class="input" style="min-width:140px"></td>
+                <td><input type="text" name="category" value="{{ item['Category'] }}" class="input"></td>
+                <td><input type="text" name="price" value="{{ item['Price'] }}" class="input"></td>
+                <td>
+                  <input type="file" name="image" form="upload-{{ loop.index }}" style="display:none" id="file-{{ loop.index }}">
+                  <button type="button" class="btn-secondary" onclick="document.getElementById('file-{{ loop.index }}').click()">رفع</button>
+                  <form id="upload-{{ loop.index }}" method="post" action="{{ url_for('admin_upload_image', item_name=item['Item Name']) }}" enctype="multipart/form-data"></form>
+                </td>
+                <td style="display:flex; gap:6px">
+                  <button type="submit" class="btn-secondary">تعديل</button>
+                  <a href="{{ url_for('admin_delete_item', item_name=item['Item Name']) }}" class="btn-danger" style="background:#dc2626; padding:6px 12px; border-radius:20px; color:white">حذف</a>
+                </td>
+              </form>
+            </tr>
             {% endfor %}
-          </div>
-        {% endif %}
+          </tbody>
+        </table>
+      </div>
+      <div style="margin-top:20px">
+        <a href="{{ url_for('admin_generate_all_images') }}" class="btn">توليد جميع الصور (AI)</a>
+      </div>
+    </div>
+  </div>
 
-        {% if shown_groups %}
-          {% for cat, cat_items in shown_groups.items() %}
-            <section class="menu-section" data-category="{{ cat }}">
-              <div class="section-title">
-                <span>{{ cat }}</span>
-                <span class="section-count">{{ cat_items|length }} {{ "صنف" if lang == "ar" else "items" }}</span>
-              </div>
-              <div class="grid">
-                {% for item in cat_items %}
-                  <article class="card item menu-card" data-name="{{ item['Item Name']|lower }}" data-desc="{{ item['Description']|lower }}">
-                    <img class="item-image" src="{{ item['ImageURL'] }}" alt="{{ item['Item Name'] }}">
-                    <div class="item-body">
-                      <div class="item-top">
-                        <h3 class="item-name">{{ item["Item Name"] }}</h3>
-                        {% if item["Price"] %}
-                          <div class="item-price">{{ format_price(item["Price"], lang, settings) }}</div>
-                        {% endif %}
-                      </div>
-                      <p class="item-desc">{{ item["Description"] or ("لا يوجد وصف" if lang == "ar" else "No description") }}</p>
-                    </div>
-                  </article>
-                {% endfor %}
-              </div>
-            </section>
-          {% endfor %}
-        {% else %}
-          <div class="center-empty">{{ "لا توجد أصناف حالياً" if lang == "ar" else "No menu items yet" }}</div>
-        {% endif %}
-
-        <script>
-          const searchInput = document.getElementById("menuSearch");
-          if (searchInput) {
-            searchInput.addEventListener("input", function () {
-              const q = this.value.trim().toLowerCase();
-              document.querySelectorAll(".menu-card").forEach(card => {
-                const hay = (card.dataset.name + " " + card.dataset.desc).toLowerCase();
-                card.style.display = (!q || hay.includes(q)) ? "" : "none";
-              });
-            });
-          }
-        </script>
-        """,
-        settings=settings,
-        stats=stats,
-        categories=categories,
-        grouped=grouped,
-        shown_groups=shown_groups,
-        active=active,
-        lang=lang,
-        format_price=format_price,
-    )
-
-    return render_template_string(
-        BASE_HTML,
-        title=settings["site_title_ar"] if lang == "ar" else settings["site_title_en"],
-        content=content,
-        lang=lang,
-        direction=page_direction(lang),
-        align=text_align(lang),
-        settings=settings,
-        is_admin=is_admin(),
-        lang_switch_url=url_for("public_menu", category=active or None, lang=("en" if lang == "ar" else "ar")),
-    )
-
-
-@app.route("/admin/login", methods=["GET", "POST"])
-def admin_login():
-    lang = get_lang()
-    settings = load_settings()
-    if request.method == "POST":
-        password = request.form.get("password", "")
-        if password == ADMIN_PASSWORD:
-            session["is_admin"] = True
-            flash("تم تسجيل الدخول بنجاح." if lang == "ar" else "Logged in successfully.", "success")
-            return redirect(url_for("admin_dashboard", lang=lang))
-        flash("كلمة المرور غير صحيحة." if lang == "ar" else "Wrong password.", "error")
-
-    content = render_template_string(
-        r"""
-        <div class="login-box">
-          <div class="card">
-            <h2 class="headline" style="font-size:32px;">{{ "دخول الإدارة" if lang == "ar" else "Admin Login" }}</h2>
-            <p class="sub">{{ "أدخل كلمة المرور للوصول للوحة التحكم" if lang == "ar" else "Enter the password to access the dashboard" }}</p>
-            <form method="post" style="margin-top:18px;">
-              <label class="field-label">{{ "كلمة المرور" if lang == "ar" else "Password" }}</label>
-              <input class="input" type="password" name="password" required>
-              <div style="margin-top:14px;">
-                <button class="btn" type="submit">{{ "دخول" if lang == "ar" else "Login" }}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-        """,
-        lang=lang,
-    )
-    return render_template_string(
-        BASE_HTML,
-        title=("دخول الإدارة" if lang == "ar" else "Admin Login"),
-        content=content,
-        lang=lang,
-        direction=page_direction(lang),
-        align=text_align(lang),
-        settings=settings,
-        is_admin=is_admin(),
-        lang_switch_url=url_for("admin_login", lang=("en" if lang == "ar" else "ar")),
-    )
-
-
-@app.route("/admin/logout")
-def admin_logout():
-    lang = get_lang()
-    session.pop("is_admin", None)
-    flash("تم تسجيل الخروج." if lang == "ar" else "Logged out.", "success")
-    return redirect(url_for("public_menu", lang=lang))
-
-
-@app.route("/admin")
-def admin_dashboard():
-    guard = require_admin()
-    if guard:
-        return guard
-
-    lang = get_lang()
-    settings = load_settings()
-    items = load_menu()
-
-    content = render_template_string(
-        r"""
-        <div class="toolbar">
-          <a class="btn secondary" href="{{ url_for('public_menu', lang=lang) }}">{{ "عرض القائمة" if lang == "ar" else "View menu" }}</a>
-        </div>
-
-        <div class="split">
-          <div class="card">
-            <h2 class="section-title" style="margin-top:0;">{{ "إضافة صنف" if lang == "ar" else "Add item" }}</h2>
-            <form method="post" action="{{ url_for('add_item', lang=lang) }}" enctype="multipart/form-data">
-              <div class="row2">
-                <div>
-                  <label class="field-label">{{ "القسم" if lang == "ar" else "Category" }}</label>
-                  <input class="input" name="category" required>
-                </div>
-                <div>
-                  <label class="field-label">{{ "السعر" if lang == "ar" else "Price" }}</label>
-                  <input class="input" name="price">
-                </div>
-              </div>
-              <div style="margin-top:12px;">
-                <label class="field-label">{{ "اسم الصنف" if lang == "ar" else "Item name" }}</label>
-                <input class="input" name="item_name" required>
-              </div>
-              <div style="margin-top:12px;">
-                <label class="field-label">{{ "الوصف" if lang == "ar" else "Description" }}</label>
-                <textarea name="description"></textarea>
-              </div>
-              <div style="margin-top:12px;">
-                <label class="field-label">{{ "صورة للصنف" if lang == "ar" else "Item image" }}</label>
-                <input class="file" type="file" name="item_image" accept="image/*">
-              </div>
-              <div style="margin-top:14px;">
-                <button class="btn" type="submit">{{ "إضافة" if lang == "ar" else "Add" }}</button>
-              </div>
-            </form>
-          </div>
-
-          <div class="card">
-            <h2 class="section-title" style="margin-top:0;">{{ "استيراد البيانات" if lang == "ar" else "Import data" }}</h2>
-            <form method="post" action="{{ url_for('import_csv_text', lang=lang) }}">
-              <label class="field-label">CSV</label>
-              <textarea name="csv_text" placeholder="Category,Item Name,Description,Price"></textarea>
-              <div style="margin-top:14px;">
-                <button class="btn" type="submit">{{ "استيراد النص" if lang == "ar" else "Import text" }}</button>
-              </div>
-            </form>
-            <hr style="border-color:rgba(255,255,255,.08); margin:20px 0;">
-            <form method="post" action="{{ url_for('import_sheet', lang=lang) }}">
-              <label class="field-label">{{ "رابط Google Sheets" if lang == "ar" else "Google Sheets URL" }}</label>
-              <input class="input" name="sheet_url" placeholder="https://docs.google.com/spreadsheets/...">
-              <div style="margin-top:14px;">
-                <button class="btn secondary" type="submit">{{ "استيراد من الرابط" if lang == "ar" else "Import from URL" }}</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <div class="split" style="margin-top:18px;">
-          <div class="card">
-            <h2 class="section-title" style="margin-top:0;">{{ "الإعدادات" if lang == "ar" else "Settings" }}</h2>
-            <form method="post" action="{{ url_for('save_site_settings', lang=lang) }}" enctype="multipart/form-data">
-              <div class="row2">
-                <div>
-                  <label class="field-label">{{ "العنوان بالعربية" if lang == "ar" else "Arabic title" }}</label>
-                  <input class="input" name="site_title_ar" value="{{ settings.site_title_ar }}">
-                </div>
-                <div>
-                  <label class="field-label">{{ "English title" }}</label>
-                  <input class="input" name="site_title_en" value="{{ settings.site_title_en }}">
-                </div>
-              </div>
-              <div class="row2" style="margin-top:12px;">
-                <div>
-                  <label class="field-label">{{ "الوصف بالعربية" if lang == "ar" else "Arabic subtitle" }}</label>
-                  <input class="input" name="site_subtitle_ar" value="{{ settings.site_subtitle_ar }}">
-                </div>
-                <div>
-                  <label class="field-label">English subtitle</label>
-                  <input class="input" name="site_subtitle_en" value="{{ settings.site_subtitle_en }}">
-                </div>
-              </div>
-              <div class="row2" style="margin-top:12px;">
-                <div>
-                  <label class="field-label">{{ "عملة العربية" if lang == "ar" else "Arabic currency" }}</label>
-                  <input class="input" name="currency_ar" value="{{ settings.currency_ar }}">
-                </div>
-                <div>
-                  <label class="field-label">{{ "English currency" }}</label>
-                  <input class="input" name="currency_en" value="{{ settings.currency_en }}">
-                </div>
-              </div>
-              <div style="margin-top:12px;">
-                <label class="field-label">{{ "الشعار" if lang == "ar" else "Logo image" }}</label>
-                <input class="file" type="file" name="logo" accept="image/*">
-                {% if settings.logo_path %}
-                  <div class="small" style="margin-top:8px;">{{ settings.logo_path }}</div>
-                {% endif %}
-              </div>
-              <div style="margin-top:14px;">
-                <button class="btn" type="submit">{{ "حفظ الإعدادات" if lang == "ar" else "Save settings" }}</button>
-              </div>
-            </form>
-          </div>
-
-          <div class="card">
-            <h2 class="section-title" style="margin-top:0;">{{ "نصائح" if lang == "ar" else "Notes" }}</h2>
-            <p class="sub">
-              {{ "الأعمدة المطلوبة في CSV هي: Category, Item Name, Description, Price" if lang == "ar"
-                else "Required CSV columns: Category, Item Name, Description, Price" }}
-            </p>
-            <p class="sub" style="margin-top:12px;">
-              {{ "توليد الصور بالذكاء الاصطناعي يحتاج OPENAI_API_KEY" if lang == "ar"
-                else "AI image generation needs OPENAI_API_KEY" }}
-            </p>
-          </div>
-        </div>
-
-        <div class="card" style="margin-top:18px;">
-          <h2 class="section-title" style="margin-top:0;">
-            <span>{{ "الأصناف الحالية" if lang == "ar" else "Current items" }}</span>
-            <span class="section-count">{{ items|length }}</span>
-          </h2>
-          {% if items %}
-            <div class="admin-table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    <th>{{ "القسم" if lang == "ar" else "Category" }}</th>
-                    <th>{{ "الاسم" if lang == "ar" else "Name" }}</th>
-                    <th>{{ "الوصف" if lang == "ar" else "Description" }}</th>
-                    <th>{{ "السعر" if lang == "ar" else "Price" }}</th>
-                    <th>{{ "الإجراءات" if lang == "ar" else "Actions" }}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {% for item in items %}
-                    <tr>
-                      <td>{{ item["Category"] }}</td>
-                      <td>{{ item["Item Name"] }}</td>
-                      <td>{{ item["Description"] }}</td>
-                      <td>{{ item["Price"] }}</td>
-                      <td class="actions">
-                        <form method="post" action="{{ url_for('generate_image_for_item', lang=lang) }}">
-                          <input type="hidden" name="item_name" value="{{ item['Item Name'] }}">
-                          <input type="hidden" name="category" value="{{ item['Category'] }}">
-                          <button class="btn secondary" type="submit">{{ "توليد صورة" if lang == "ar" else "Generate image" }}</button>
-                        </form>
-                        <form method="get" action="{{ url_for('edit_item_page') }}">
-                          <input type="hidden" name="item_name" value="{{ item['Item Name'] }}">
-                          <input type="hidden" name="lang" value="{{ lang }}">
-                          <button class="btn secondary" type="submit">{{ "تعديل" if lang == "ar" else "Edit" }}</button>
-                        </form>
-                        <form method="post" action="{{ url_for('delete_item', lang=lang) }}" onsubmit="return confirm('{{ 'حذف الصنف؟' if lang == 'ar' else 'Delete item?' }}')">
-                          <input type="hidden" name="item_name" value="{{ item['Item Name'] }}">
-                          <button class="btn danger" type="submit">{{ "حذف" if lang == "ar" else "Delete" }}</button>
-                        </form>
-                      </td>
-                    </tr>
-                  {% endfor %}
-                </tbody>
-              </table>
-            </div>
-          {% else %}
-            <div class="center-empty">{{ "لا توجد أصناف بعد" if lang == "ar" else "No items yet" }}</div>
-          {% endif %}
-        </div>
-        """,
-        lang=lang,
-        settings=settings,
-        items=items,
-    )
-
-    return render_template_string(
-        BASE_HTML,
-        title=("لوحة التحكم" if lang == "ar" else "Dashboard"),
-        content=content,
-        lang=lang,
-        direction=page_direction(lang),
-        align=text_align(lang),
-        settings=settings,
-        is_admin=is_admin(),
-        lang_switch_url=url_for("admin_dashboard", lang=("en" if lang == "ar" else "ar")),
-    )
-
-
-@app.route("/admin/item/add", methods=["POST"])
-def add_item():
-    guard = require_admin()
-    if guard:
-        return guard
-    lang = get_lang()
-    items = load_menu()
-
-    item = {
-        "Category": request.form.get("category", "").strip(),
-        "Item Name": request.form.get("item_name", "").strip(),
-        "Description": request.form.get("description", "").strip(),
-        "Price": request.form.get("price", "").strip(),
+  <script>
+    function toggleSource(val) {
+      document.getElementById('fileSource').style.display = val === 'file' ? 'block' : 'none';
+      document.getElementById('urlSource').style.display = val === 'url' ? 'block' : 'none';
+      document.getElementById('textSource').style.display = val === 'text' ? 'block' : 'none';
     }
-    if not item["Category"] or not item["Item Name"]:
-        flash("القسم واسم الصنف مطلوبان." if lang == "ar" else "Category and item name are required.", "error")
-        return redirect(url_for("admin_dashboard", lang=lang))
+    toggleSource('file');
+  </script>
+</body>
+</html>
+"""
 
-    # replace if same name exists
-    replaced = False
-    for idx, old in enumerate(items):
-        if old["Item Name"].strip().lower() == item["Item Name"].strip().lower():
-            items[idx] = item
-            replaced = True
-            break
-    if not replaced:
-        items.append(item)
-
-    image = request.files.get("item_image")
-    if image and image.filename:
-        save_item_image(item["Item Name"], image)
-
-    save_menu(items)
-    flash("تم حفظ الصنف." if lang == "ar" else "Item saved.", "success")
-    return redirect(url_for("admin_dashboard", lang=lang))
-
-
-@app.route("/admin/item/edit")
-def edit_item_page():
-    guard = require_admin()
-    if guard:
-        return guard
-    lang = get_lang()
-    settings = load_settings()
-    item_name = request.args.get("item_name", "").strip()
-    items = load_menu()
-    item = next((x for x in items if x["Item Name"] == item_name), None)
-    if not item:
-        flash("الصنف غير موجود." if lang == "ar" else "Item not found.", "error")
-        return redirect(url_for("admin_dashboard", lang=lang))
-
-    content = render_template_string(
-        r"""
-        <div class="card">
-          <h2 class="section-title" style="margin-top:0;">{{ "تعديل الصنف" if lang == "ar" else "Edit item" }}</h2>
-          <form method="post" action="{{ url_for('edit_item', lang=lang) }}" enctype="multipart/form-data">
-            <input type="hidden" name="original_item_name" value="{{ item['Item Name'] }}">
-            <div class="row2">
-              <div>
-                <label class="field-label">{{ "القسم" if lang == "ar" else "Category" }}</label>
-                <input class="input" name="category" value="{{ item['Category'] }}" required>
-              </div>
-              <div>
-                <label class="field-label">{{ "السعر" if lang == "ar" else "Price" }}</label>
-                <input class="input" name="price" value="{{ item['Price'] }}">
-              </div>
-            </div>
-            <div style="margin-top:12px;">
-              <label class="field-label">{{ "اسم الصنف" if lang == "ar" else "Item name" }}</label>
-              <input class="input" name="item_name" value="{{ item['Item Name'] }}" required>
-            </div>
-            <div style="margin-top:12px;">
-              <label class="field-label">{{ "الوصف" if lang == "ar" else "Description" }}</label>
-              <textarea name="description">{{ item['Description'] }}</textarea>
-            </div>
-            <div style="margin-top:12px;">
-              <label class="field-label">{{ "تغيير الصورة" if lang == "ar" else "Replace image" }}</label>
-              <input class="file" type="file" name="item_image" accept="image/*">
-            </div>
-            <div style="margin-top:14px;" class="toolbar">
-              <button class="btn" type="submit">{{ "حفظ" if lang == "ar" else "Save" }}</button>
-              <a class="btn secondary" href="{{ url_for('admin_dashboard', lang=lang) }}">{{ "رجوع" if lang == "ar" else "Back" }}</a>
-            </div>
-          </form>
-        </div>
-        """,
-        lang=lang,
-        item=item,
-    )
-    return render_template_string(
-        BASE_HTML,
-        title=("تعديل الصنف" if lang == "ar" else "Edit item"),
-        content=content,
-        lang=lang,
-        direction=page_direction(lang),
-        align=text_align(lang),
-        settings=settings,
-        is_admin=is_admin(),
-        lang_switch_url=url_for("edit_item_page", item_name=item_name, lang=("en" if lang == "ar" else "ar")),
-    )
-
-
-@app.route("/admin/item/edit", methods=["POST"])
-def edit_item():
-    guard = require_admin()
-    if guard:
-        return guard
-    lang = get_lang()
-    original = request.form.get("original_item_name", "").strip()
-    new_item = {
-        "Category": request.form.get("category", "").strip(),
-        "Item Name": request.form.get("item_name", "").strip(),
-        "Description": request.form.get("description", "").strip(),
-        "Price": request.form.get("price", "").strip(),
-    }
-    items = load_menu()
-    updated = False
-    for idx, item in enumerate(items):
-        if item["Item Name"] == original:
-            items[idx] = new_item
-            updated = True
-            break
-    if not updated:
-        flash("الصنف غير موجود." if lang == "ar" else "Item not found.", "error")
-        return redirect(url_for("admin_dashboard", lang=lang))
-
-    image = request.files.get("item_image")
-    if image and image.filename:
-        save_item_image(new_item["Item Name"], image)
-
-    save_menu(items)
-    flash("تم تحديث الصنف." if lang == "ar" else "Item updated.", "success")
-    return redirect(url_for("admin_dashboard", lang=lang))
-
-
-@app.route("/admin/item/delete", methods=["POST"])
-def delete_item():
-    guard = require_admin()
-    if guard:
-        return guard
-    lang = get_lang()
-    item_name = request.form.get("item_name", "").strip()
-    items = load_menu()
-    new_items = [x for x in items if x["Item Name"] != item_name]
-    save_menu(new_items)
-    flash("تم حذف الصنف." if lang == "ar" else "Item deleted.", "success")
-    return redirect(url_for("admin_dashboard", lang=lang))
-
-
-@app.route("/admin/import/csv-text", methods=["POST"])
-def import_csv_text():
-    guard = require_admin()
-    if guard:
-        return guard
-    lang = get_lang()
-    text = request.form.get("csv_text", "").strip()
-    if not text:
-        flash("ألصق نص CSV أولاً." if lang == "ar" else "Paste CSV text first.", "error")
-        return redirect(url_for("admin_dashboard", lang=lang))
-    try:
-        items = parse_csv_text(text)
-        save_menu(items)
-        flash("تم استيراد البيانات." if lang == "ar" else "Data imported.", "success")
-    except Exception as e:
-        flash((f"فشل الاستيراد: {e}") if lang == "ar" else f"Import failed: {e}", "error")
-    return redirect(url_for("admin_dashboard", lang=lang))
-
-
-@app.route("/admin/import/sheet", methods=["POST"])
-def import_sheet():
-    guard = require_admin()
-    if guard:
-        return guard
-    lang = get_lang()
-    url = request.form.get("sheet_url", "").strip()
-    if not url:
-        flash("أدخل الرابط أولاً." if lang == "ar" else "Enter the URL first.", "error")
-        return redirect(url_for("admin_dashboard", lang=lang))
-    try:
-        csv_url = sheets_to_csv_url(url)
-        text = download_text(csv_url)
-        items = parse_csv_text(text)
-        save_menu(items)
-        flash("تم الاستيراد من Google Sheets." if lang == "ar" else "Imported from Google Sheets.", "success")
-    except Exception as e:
-        flash((f"فشل الاستيراد: {e}") if lang == "ar" else f"Import failed: {e}", "error")
-    return redirect(url_for("admin_dashboard", lang=lang))
-
-
-@app.route("/admin/settings/save", methods=["POST"])
-def save_site_settings():
-    guard = require_admin()
-    if guard:
-        return guard
-    lang = get_lang()
-    data = {
-        "site_title_ar": request.form.get("site_title_ar", "").strip() or "قائمة المطعم",
-        "site_title_en": request.form.get("site_title_en", "").strip() or "Restaurant Menu",
-        "site_subtitle_ar": request.form.get("site_subtitle_ar", "").strip() or "قائمة رقمية حديثة",
-        "site_subtitle_en": request.form.get("site_subtitle_en", "").strip() or "Modern digital menu",
-        "currency_ar": request.form.get("currency_ar", "").strip() or "د.ع",
-        "currency_en": request.form.get("currency_en", "").strip() or "IQD",
-    }
-    logo = request.files.get("logo")
-    if logo and logo.filename:
-        data["logo_path"] = save_uploaded_logo(logo)
-    save_settings(data)
-    flash("تم حفظ الإعدادات." if lang == "ar" else "Settings saved.", "success")
-    return redirect(url_for("admin_dashboard", lang=lang))
-
-
-@app.route("/admin/item/generate-image", methods=["POST"])
-def generate_image_for_item():
-    guard = require_admin()
-    if guard:
-        return guard
-    lang = get_lang()
-    item_name = request.form.get("item_name", "").strip()
-    category = request.form.get("category", "").strip()
-    if not item_name:
-        flash("اسم الصنف مطلوب." if lang == "ar" else "Item name is required.", "error")
-        return redirect(url_for("admin_dashboard", lang=lang))
-    _, err = generate_item_image(item_name, category)
-    if err:
-        flash((f"فشل توليد الصورة: {err}") if lang == "ar" else f"Image generation failed: {err}", "error")
-    else:
-        flash("تم توليد الصورة." if lang == "ar" else "Image generated.", "success")
-    return redirect(url_for("admin_dashboard", lang=lang))
-
-
-@app.route("/images/<path:filename>")
-def images(filename):
-    return send_from_directory(IMAGE_DIR, filename)
-
-
-@app.route("/uploads/<path:filename>")
-def uploads(filename):
-    return send_from_directory(UPLOAD_DIR, filename)
-
-
-@app.route("/health")
-def health():
-    return {"ok": True, "items": len(load_menu())}
-
-
+# ========== Run ==========
 if __name__ == "__main__":
     app.run(host=host, port=port, debug=False)
