@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { GoogleAuthProvider, signInWithPopup, onAuthStateChanged } from 'firebase/auth';
 import { db, auth, storage } from '../firebase';
 import { collection, onSnapshot, query, orderBy, addDoc, updateDoc, deleteDoc, doc, setDoc, getDoc } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
@@ -24,7 +23,6 @@ export default function Admin() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [user, setUser] = useState<any>(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
@@ -37,9 +35,6 @@ export default function Admin() {
   };
 
   useEffect(() => {
-    const unsubAuth = onAuthStateChanged(auth, (u) => {
-      setUser(u);
-    });
 
     const unsubSections = onSnapshot(query(collection(db, 'sections'), orderBy('order')), (snap) => {
       setSections(snap.docs.map(d => ({ id: d.id, ...d.data() } as Section)));
@@ -54,7 +49,6 @@ export default function Admin() {
     }, (err) => handleFirestoreError(err, OperationType.GET, 'settings/global'));
 
     return () => {
-      unsubAuth();
       unsubSections();
       unsubItems();
       unsubSettings();
@@ -67,16 +61,6 @@ export default function Admin() {
       setError('');
     } else {
       setError(t('invalid_password'));
-    }
-  };
-
-  const handleGoogleSignIn = async () => {
-    try {
-      const provider = new GoogleAuthProvider();
-      await signInWithPopup(auth, provider);
-    } catch (err) {
-      console.error(err);
-      setError('Google Sign-in failed');
     }
   };
 
@@ -223,8 +207,6 @@ export default function Admin() {
       </div>
     );
   }
-
-  if (!user || user.email !== 'antwanadel5@gmail.com') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-black p-4">
         <div className="max-w-md w-full bg-white/5 rounded-2xl shadow-2xl p-8 border border-white/10 text-center">
